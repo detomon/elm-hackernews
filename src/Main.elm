@@ -78,6 +78,16 @@ getItemId item =
         ItemError error _ -> 0
         Item value -> HN.itemId value
 
+replacePlaceholderItem : Int -> Item -> List Item -> List Item
+replacePlaceholderItem itemId newItem =
+    List.map (\item ->
+        case item of
+            ItemPlaceholder id ->
+                if id == itemId then newItem else item
+
+            _ -> item
+    )
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -95,17 +105,8 @@ update msg model =
 
                         HN.GotItem id result ->
                             case result of
-                                Ok item -> { model | posts = setItem (HN.itemId item) (Item item) model.posts }
-                                Err err -> { model | posts = setItem id (ItemError id <| resultErrorString err) model.posts }
-
-                setItem itemId newItem =
-                    List.map (\i ->
-                        case i of
-                            ItemPlaceholder id ->
-                                if id == itemId then newItem else i
-
-                            _ -> i
-                    )
+                                Ok item -> { model | posts = replacePlaceholderItem (HN.itemId item) (Item item) model.posts }
+                                Err err -> { model | posts = replacePlaceholderItem id (ItemError id <| resultErrorString err) model.posts }
             in
             ( newModel, Cmd.map HackerNewsMsg (HN.update submsg) )
 

@@ -100,6 +100,7 @@ itemId item =
     case item of
         ItemStory story ->
             story.id
+
         ItemComment comment ->
             comment.id
 
