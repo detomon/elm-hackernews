@@ -110,13 +110,7 @@ thead {
 
 .post {
 	margin-bottom: 0.5em;
-	/*transition: padding ease-out 0.33s;
-	transition-timing-function: cubic-bezier(0.3, 0, 0, 1);*/
 }
-
-/*.post:not(.post--placeholder):not(.post--error):hover {
-	padding-left: 0.5em;
-}*/
 
 .post--placeholder {
 	color: var(--color-disabled);
@@ -128,11 +122,11 @@ thead {
 }
 
 .post--placeholder .post-title {
-	max-width: 30em;
+	max-width: 25em;
 }
 
 .post--placeholder .post-info {
-	max-width: 7em;
+	max-width: 18em;
 }
 
 .post--error {

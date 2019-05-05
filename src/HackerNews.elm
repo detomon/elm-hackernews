@@ -6,6 +6,29 @@ module HackerNews exposing
     , itemId
     )
 
+
+{-| Fetch Hackernews stories and comments.
+
+@docs Msg, Item, Story, Comment
+
+
+# Update
+
+@docs update
+
+
+# Network
+
+@docs fetchTopStories
+
+
+# Helpers
+
+@docs itemId
+
+-}
+
+
 import Http
 import Json.Decode as D
 import Json.Decode.Pipeline as JP
@@ -15,10 +38,15 @@ import Time
 -- TYPES
 
 
+{-| Messages.
+-}
 type Msg
     = GotTopStories Int (Result Http.Error (List Int))
     | GotItem Int (Result Http.Error Item)
 
+
+{-| Story item.
+-}
 type alias Story =
     { by : String
     , descendants : Int
@@ -30,6 +58,9 @@ type alias Story =
     , url : Maybe String
     }
 
+
+{-| Comment item.
+-}
 type alias Comment =
     { by : String
     , id : Int
@@ -39,6 +70,9 @@ type alias Comment =
     , time : Time.Posix
     }
 
+
+{-| Allowed item types.
+-}
 type Item
     = ItemStory Story
     | ItemComment Comment
@@ -47,14 +81,22 @@ type Item
 -- API URLS
 
 
+{-| The base URL.
+-}
 baseUrl : String
 baseUrl =
     "https://hacker-news.firebaseio.com/v0"
 
+
+{-| The top stories URL.
+-}
 topStoriesUrl : String
 topStoriesUrl =
     baseUrl ++ "/topstories.json"
 
+
+{-| Make item URL with ID.
+-}
 itemUrl : Int -> String
 itemUrl id =
     baseUrl ++ "/item/" ++ String.fromInt id ++ ".json"
@@ -63,6 +105,8 @@ itemUrl id =
 -- MAIN
 
 
+{-| Update.
+-}
 update : Msg -> Cmd Msg
 update msg =
     case msg of
@@ -88,13 +132,18 @@ update msg =
                     Cmd.none
 
 
--- HELPER FUNCTIONS
+-- HELPERS
 
 
+{-| Create Time.Posix from seconds.
+-}
 timeFromSeconds : Int -> Time.Posix
 timeFromSeconds seconds =
     Time.millisToPosix (seconds * 1000)
 
+
+{-| Get ID of item.
+-}
 itemId : Item -> Int
 itemId item =
     case item of
@@ -108,6 +157,8 @@ itemId item =
 -- NETWORK
 
 
+{-| Fetch ID of top stories.
+-}
 fetchTopStoriesGet : (Result Http.Error (List Int) -> Msg) -> Cmd Msg
 fetchTopStoriesGet msg =
     Http.get
@@ -115,6 +166,9 @@ fetchTopStoriesGet msg =
         , expect = Http.expectJson msg decodeItemIds
         }
 
+
+{-| Fetch item with ID.
+-}
 fetchItem : (Result Http.Error Item -> Msg) -> Int -> Cmd Msg
 fetchItem msg id =
     Http.get
@@ -122,10 +176,16 @@ fetchItem msg id =
         , expect = Http.expectJson msg decodeItem
         }
 
+
+{-| Decode list of item IDs.
+-}
 decodeItemIds : D.Decoder (List Int)
 decodeItemIds =
     D.list D.int
 
+
+{-| Decode result item.
+-}
 decodeItem : D.Decoder Item
 decodeItem =
     let
@@ -159,6 +219,9 @@ decodeItem =
     D.field "type" D.string
         |> D.andThen decodeType
 
+
+{-| Fetch top stories with limit.
+-}
 fetchTopStories : Int -> Cmd Msg
 fetchTopStories limit =
     fetchTopStoriesGet (GotTopStories limit)

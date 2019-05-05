@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+
 import Browser
 import Html as H
 import Html.Attributes as A
@@ -12,6 +13,7 @@ import Time
 import Task
 import HackerNews as HN
 
+
 type alias Model =
     { title : String
     , error : Maybe String
@@ -19,10 +21,12 @@ type alias Model =
     , posts : List Item
     }
 
+
 type Item
     = ItemPlaceholder Int
     | ItemError Int String
     | Item HN.Item
+
 
 type Msg
     = GotTimeZone Time.Zone
@@ -71,12 +75,14 @@ resultErrorString error =
         Http.NetworkError     -> "NetworkError"
         Http.BadBody str      -> "BadBody: " ++ str
 
+
 getItemId : Item -> Int
 getItemId item =
     case item of
         ItemPlaceholder id -> id
         ItemError error _ -> 0
         Item value -> HN.itemId value
+
 
 replacePlaceholderItem : Int -> Item -> List Item -> List Item
 replacePlaceholderItem itemId newItem =
@@ -87,6 +93,7 @@ replacePlaceholderItem itemId newItem =
 
             _ -> item
     )
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -123,6 +130,7 @@ nodeIf name attrs children flag =
     else
         H.text ""
 
+
 fixInt : Int -> Int -> String
 fixInt length i =
     let
@@ -130,6 +138,7 @@ fixInt length i =
             String.fromInt i
     in
     String.repeat (length - String.length str) "0" ++ str
+
 
 formatDateTime : Time.Zone -> Time.Posix -> String
 formatDateTime zone posix =
@@ -177,6 +186,7 @@ view model =
         ]
     }
 
+
 viewPost : Item -> H.Html Msg
 viewPost post =
     case post of
@@ -200,6 +210,7 @@ viewPost post =
 
                 HN.ItemComment _ ->
                     H.text ""
+
 
 viewPostTitle : String -> String -> String -> Maybe String -> H.Html Msg
 viewPostTitle class title info href =
