@@ -184,40 +184,43 @@ decodeItemIds =
     D.list D.int
 
 
+{-| Decode item with type name.
+-}
+decodeItemWithType : String -> D.Decoder Item
+decodeItemWithType type_ =
+    case type_ of
+        "story" ->
+            D.succeed Story
+                |> JP.required "by" D.string
+                |> JP.required "descendants" D.int
+                |> JP.required "id" D.int
+                |> JP.optional "kids" (D.list D.int) []
+                |> JP.required "score" D.int
+                |> JP.required "time" (D.int |> D.map timeFromSeconds)
+                |> JP.required "title" D.string
+                |> JP.optional "url" (D.string |> D.map Just) Nothing
+                |> D.map ItemStory
+
+        "comment" ->
+            D.succeed Comment
+                |> JP.required "by" D.string
+                |> JP.required "id" D.int
+                |> JP.optional "kids" (D.list D.int) []
+                |> JP.required "parent" D.int
+                |> JP.required "text" D.string
+                |> JP.custom (D.field "time" D.int |> D.map timeFromSeconds)
+                |> D.map ItemComment
+
+        _ ->
+            D.fail ("Unknown type '" ++ type_ ++ "'")
+
+
 {-| Decode result item.
 -}
 decodeItem : D.Decoder Item
 decodeItem =
-    let
-        decodeType type_ =
-            case type_ of
-                "story" ->
-                    D.succeed Story
-                        |> JP.required "by" D.string
-                        |> JP.required "descendants" D.int
-                        |> JP.required "id" D.int
-                        |> JP.optional "kids" (D.list D.int) []
-                        |> JP.required "score" D.int
-                        |> JP.required "time" (D.int |> D.map timeFromSeconds)
-                        |> JP.required "title" D.string
-                        |> JP.optional "url" (D.string |> D.map Just) Nothing
-                        |> D.map ItemStory
-
-                "comment" ->
-                    D.succeed Comment
-                        |> JP.required "by" D.string
-                        |> JP.required "id" D.int
-                        |> JP.optional "kids" (D.list D.int) []
-                        |> JP.required "parent" D.int
-                        |> JP.required "text" D.string
-                        |> JP.custom (D.field "time" D.int |> D.map timeFromSeconds)
-                        |> D.map ItemComment
-
-                _ ->
-                    D.fail ("Unknown type '" ++ type_ ++ "'")
-    in
     D.field "type" D.string
-        |> D.andThen decodeType
+        |> D.andThen decodeItemWithType
 
 
 {-| Fetch top stories with limit.
