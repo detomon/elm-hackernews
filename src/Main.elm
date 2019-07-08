@@ -2,6 +2,7 @@ module Main exposing (main)
 
 
 import Browser
+import HackerNews as HN
 import Html as H
 import Html.Attributes as A
 import Html.Events as E
@@ -9,9 +10,8 @@ import Html.Keyed as Keyed
 import Html.Lazy as Lazy
 import Http
 import Json.Decode as Decode
-import Time
 import Task
-import HackerNews as HN
+import Time
 
 
 type alias Model =
@@ -52,7 +52,6 @@ main =
         , view = view
         , subscriptions = \_ -> Sub.none
         }
-
 init : () -> (Model, Cmd Msg)
 init flags =
     let
@@ -98,6 +97,7 @@ replacePlaceholderItem itemId newItem =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        -- fetch top stories after retrieving time zone
         GotTimeZone timeZone ->
             ( { model | timeZone = timeZone }, Cmd.map HackerNewsMsg (HN.fetchTopStories postLimit) )
 
@@ -105,15 +105,15 @@ update msg model =
             let
                 newModel =
                     case submsg of
-                        HN.GotTopStories limit result ->
+                        HN.GotTopStories result ->
                             case result of
-                                Ok list -> { model | posts = list |> List.take limit |> List.map (\id -> ItemPlaceholder id) }
+                                Ok list -> { model | posts = list |> List.map (\id -> ItemPlaceholder id) }
                                 Err err -> { model | error = Just (resultErrorString err) }
 
                         HN.GotItem id result ->
                             case result of
                                 Ok item -> { model | posts = replacePlaceholderItem (HN.itemId item) (Item item) model.posts }
-                                Err err -> { model | posts = replacePlaceholderItem id (ItemError id <| resultErrorString err) model.posts }
+                                Err err -> { model | posts = replacePlaceholderItem id (ItemError id (resultErrorString err)) model.posts }
             in
             ( newModel, Cmd.map HackerNewsMsg (HN.update submsg) )
 
@@ -131,46 +131,11 @@ nodeIf name attrs children flag =
         H.text ""
 
 
-fixInt : Int -> Int -> String
-fixInt length i =
-    let
-        str =
-            String.fromInt i
-    in
-    String.repeat (length - String.length str) "0" ++ str
-
-
-formatDateTime : Time.Zone -> Time.Posix -> String
-formatDateTime zone posix =
-    let
-        toMonth month =
-            case month of
-                Time.Jan -> 1
-                Time.Feb -> 2
-                Time.Mar -> 3
-                Time.Apr -> 4
-                Time.May -> 5
-                Time.Jun -> 6
-                Time.Jul -> 7
-                Time.Aug -> 8
-                Time.Sep -> 9
-                Time.Oct -> 10
-                Time.Nov -> 11
-                Time.Dec -> 12
-    in
-    (String.fromInt <| Time.toYear zone posix) ++ "-" ++
-        (fixInt 2 <| toMonth <| Time.toMonth zone posix) ++ "-" ++
-        (fixInt 2 <| Time.toDay zone posix) ++ " " ++
-        (fixInt 2 <| Time.toHour zone posix) ++ ":" ++
-        (fixInt 2 <| Time.toMinute zone posix) ++ ":" ++
-        (fixInt 2 <| Time.toSecond zone posix)
-
-
 view : Model -> Browser.Document Msg
 view model =
     let
         postKeyed item =
-            ( String.fromInt <| getItemId item, Lazy.lazy viewPost item )
+            ( String.fromInt (getItemId item), Lazy.lazy viewPost item )
     in
     { title = model.title
     , body =

@@ -41,7 +41,7 @@ import Time
 {-| Messages.
 -}
 type Msg
-    = GotTopStories Int (Result Http.Error (List Int))
+    = GotTopStories (Result Http.Error (List Int))
     | GotItem Int (Result Http.Error Item)
 
 
@@ -110,11 +110,10 @@ itemUrl id =
 update : Msg -> Cmd Msg
 update msg =
     case msg of
-        GotTopStories limit result ->
+        GotTopStories result ->
             case result of
                 Ok ids ->
                     ids
-                        |> List.take limit
                         |> List.map (\id -> fetchItem (GotItem id) id)
                         |> Cmd.batch
 
@@ -135,13 +134,6 @@ update msg =
 -- HELPERS
 
 
-{-| Create Time.Posix from seconds.
--}
-timeFromSeconds : Int -> Time.Posix
-timeFromSeconds seconds =
-    Time.millisToPosix (seconds * 1000)
-
-
 {-| Get ID of item.
 -}
 itemId : Item -> Int
@@ -159,11 +151,15 @@ itemId item =
 
 {-| Fetch ID of top stories.
 -}
-fetchTopStoriesGet : (Result Http.Error (List Int) -> Msg) -> Cmd Msg
-fetchTopStoriesGet msg =
+fetchTopStoriesGet : Int -> (Result Http.Error (List Int) -> Msg) -> Cmd Msg
+fetchTopStoriesGet limit msg =
+    let
+        limitList result =
+            msg <| Result.map (List.take limit) result
+    in
     Http.get
         { url = topStoriesUrl
-        , expect = Http.expectJson msg decodeItemIds
+        , expect = Http.expectJson limitList decodeItemIds
         }
 
 
@@ -188,6 +184,10 @@ decodeItemIds =
 -}
 decodeItemWithType : String -> D.Decoder Item
 decodeItemWithType type_ =
+    let
+        timeFromSeconds seconds =
+            Time.millisToPosix (seconds * 1000)
+    in
     case type_ of
         "story" ->
             D.succeed Story
@@ -227,4 +227,4 @@ decodeItem =
 -}
 fetchTopStories : Int -> Cmd Msg
 fetchTopStories limit =
-    fetchTopStoriesGet (GotTopStories limit)
+    fetchTopStoriesGet limit GotTopStories
