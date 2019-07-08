@@ -46,11 +46,6 @@ itemsPerPage =
     30
 
 
-hackernewsUrl : String
-hackernewsUrl =
-    "https://news.ycombinator.com"
-
-
 -- MAIN
 
 
@@ -116,7 +111,8 @@ replacePlaceholderItem itemId newItem =
 
 paging : Int -> List a -> List a
 paging page =
-    List.drop (itemsPerPage * page) >> List.take itemsPerPage
+    List.drop (itemsPerPage * page)
+        >> List.take itemsPerPage
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -239,7 +235,7 @@ view model =
         [ H.node "link" [ A.rel "stylesheet", A.href "base.css" ] []
         , H.div [ A.class "page-wrapper" ]
             [ H.h1 [ A.class "page-title" ]
-                [ H.a [ A.href hackernewsUrl, A.rel "noreferrer" ] [ H.text model.title ]
+                [ H.a [ A.href HN.pageUrl, A.rel "noreferrer" ] [ H.text model.title ]
                 ]
             , nodeIf "div" [ A.class "error-message" ]
                 [ H.text (model.error |> Maybe.withDefault "") ]

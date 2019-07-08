@@ -1,6 +1,7 @@
 module HackerNews exposing
     ( Msg (..), Item (..)
     , Story, Comment
+    , pageUrl
     , fetchTopStories
     , fetchItems
     , itemId
@@ -76,7 +77,14 @@ type Item
 -- API URLS
 
 
-{-| The base URL.
+{-| The main site URL.
+-}
+pageUrl : String
+pageUrl =
+    "https://news.ycombinator.com"
+
+
+{-| The base API URL.
 -}
 baseUrl : String
 baseUrl =
@@ -119,17 +127,15 @@ itemId item =
 -}
 fetchItem : (Result Http.Error Item -> Msg) -> Int -> Cmd Msg
 fetchItem msg id =
+    let
+        decodeItem =
+            D.field "type" D.string
+                |> D.andThen decodeItemWithType
+    in
     Http.get
         { url = itemUrl id
         , expect = Http.expectJson msg decodeItem
         }
-
-
-{-| Decode list of item IDs.
--}
-decodeItemIds : D.Decoder (List Int)
-decodeItemIds =
-    D.list D.int
 
 
 {-| Decode item with type name.
@@ -167,27 +173,23 @@ decodeItemWithType type_ =
             D.fail ("Unknown type '" ++ type_ ++ "'")
 
 
-{-| Decode result item.
--}
-decodeItem : D.Decoder Item
-decodeItem =
-    D.field "type" D.string
-        |> D.andThen decodeItemWithType
-
-
-{-| Fetch top stories with limit.
+{-| Fetch top stories.
 -}
 fetchTopStories : Cmd Msg
 fetchTopStories =
+    let
+        decodeItemIds =
+            D.list D.int
+    in
     Http.get
         { url = topStoriesUrl
         , expect = Http.expectJson GotTopStories decodeItemIds
         }
 
-{-| Fetch items eith given IDs.
+
+{-| Fetch items with given IDs.
 -}
 fetchItems : List Int -> Cmd Msg
-fetchItems ids =
-    ids
-        |> List.map (\id -> fetchItem (GotItem id) id)
-        |> Cmd.batch
+fetchItems =
+    List.map (\id -> fetchItem (GotItem id) id)
+        >> Cmd.batch
