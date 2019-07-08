@@ -93,7 +93,12 @@ thead {
 	font-weight: bold;
 }
 
-.page-title:before {
+.page-title a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.page-title a:before {
 	width: 1.33em;
 	height: 1.33em;
 	margin-right: 0.5em;
@@ -144,4 +149,25 @@ thead {
 	display: block;
 	font-size: 0.66em;
 	color: var(--color-inactive);
+}
+
+/* -------------------------------------------------------------------------- */
+
+.paging {
+	margin: 2em 0 1em;
+	padding: 0;
+	list-style: none;
+}
+
+.paging__page {
+	display: inline;
+}
+
+.paging__page.paging--active {
+	font-weight: bold;
+}
+
+.paging__page a {
+	cursor: pointer;
+	padding: 0 0.5em;
 }

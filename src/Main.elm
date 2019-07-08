@@ -2,6 +2,7 @@ module Main exposing (main)
 
 
 import Browser
+import Dict
 import HackerNews as HN
 import Html as H
 import Html.Attributes as A
@@ -18,7 +19,10 @@ type alias Model =
     { title : String
     , error : Maybe String
     , timeZone : Time.Zone
-    , posts : List Item
+    , items : List Item
+    , itemIds : List Int
+    , itemsCache : Dict.Dict Int HN.Item
+    , page : Int
     }
 
 
@@ -31,14 +35,20 @@ type Item
 type Msg
     = GotTimeZone Time.Zone
     | HackerNewsMsg HN.Msg
+    | UpdatePage Int
 
 
 -- SETTINGS
 
 
-postLimit : Int
-postLimit =
+itemsPerPage : Int
+itemsPerPage =
     30
+
+
+hackernewsUrl : String
+hackernewsUrl =
+    "https://news.ycombinator.com"
 
 
 -- MAIN
@@ -52,6 +62,8 @@ main =
         , view = view
         , subscriptions = \_ -> Sub.none
         }
+
+
 init : () -> (Model, Cmd Msg)
 init flags =
     let
@@ -59,7 +71,10 @@ init flags =
             { title = "Hacker News"
             , error = Nothing
             , timeZone = Time.utc
-            , posts = []
+            , items = []
+            , itemIds = []
+            , itemsCache = Dict.empty
+            , page = 0
             }
     in
     ( model, Task.perform GotTimeZone Time.here )
@@ -83,6 +98,11 @@ getItemId item =
         Item value -> HN.itemId value
 
 
+pagesCount : Model -> Int
+pagesCount model =
+    (List.length model.itemIds + itemsPerPage - 1) // itemsPerPage
+
+
 replacePlaceholderItem : Int -> Item -> List Item -> List Item
 replacePlaceholderItem itemId newItem =
     List.map (\item ->
@@ -94,28 +114,96 @@ replacePlaceholderItem itemId newItem =
     )
 
 
+paging : Int -> List a -> List a
+paging page =
+    List.drop (itemsPerPage * page) >> List.take itemsPerPage
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         -- fetch top stories after retrieving time zone
         GotTimeZone timeZone ->
-            ( { model | timeZone = timeZone }, Cmd.map HackerNewsMsg (HN.fetchTopStories postLimit) )
+            ( { model | timeZone = timeZone }, Cmd.map HackerNewsMsg HN.fetchTopStories )
 
         HackerNewsMsg submsg ->
-            let
-                newModel =
-                    case submsg of
-                        HN.GotTopStories result ->
-                            case result of
-                                Ok list -> { model | posts = list |> List.map (\id -> ItemPlaceholder id) }
-                                Err err -> { model | error = Just (resultErrorString err) }
+            case submsg of
+                HN.GotTopStories result ->
+                    case result of
+                        Ok list ->
+                            let
+                                newModel = 
+                                    { model
+                                        | itemIds = list
+                                    }   
+                            in
+                            update (UpdatePage model.page) newModel
 
-                        HN.GotItem id result ->
-                            case result of
-                                Ok item -> { model | posts = replacePlaceholderItem (HN.itemId item) (Item item) model.posts }
-                                Err err -> { model | posts = replacePlaceholderItem id (ItemError id (resultErrorString err)) model.posts }
+                        Err err ->
+                            ( { model
+                                | error = Just (resultErrorString err)
+                            }, Cmd.none )
+
+                HN.GotItem id result ->
+                    case result of
+                        Ok item ->
+                            ( { model
+                                | items = replacePlaceholderItem id (Item item) model.items
+                                , itemsCache = Dict.insert id item model.itemsCache
+                            }, Cmd.none )
+
+                        Err err ->
+                            ( { model
+                                | items = replacePlaceholderItem id (ItemError id (resultErrorString err)) model.items
+                            }, Cmd.none )
+
+        UpdatePage page ->
+            let
+                getItem id =
+                    case Dict.get id model.itemsCache of
+                        Just item ->
+                            Item item
+
+                        Nothing ->
+                            ItemPlaceholder id
+
+                itemList =
+                    model.itemIds
+                        |> paging page
+                        |> List.map getItem
+
+                isPlaceholder item =
+                    case item of
+                        ItemPlaceholder _ ->
+                            True
+
+                        _ ->
+                            False
+
+                loadItems =
+                    itemList
+                        |> List.filter isPlaceholder 
+                        |> List.map getItemId
+
+                newModel =
+                    { model
+                        | page = page
+                        , items = itemList
+                    }
             in
-            ( newModel, Cmd.map HackerNewsMsg (HN.update submsg) )
+            ( newModel, Cmd.map HackerNewsMsg (HN.fetchItems loadItems) )
+
+
+for : (Int -> a) -> Int -> List a
+for fn count =
+    let
+        item n =
+            if n < count then
+                fn n :: item (n + 1)
+            else
+                []
+    in
+    item 0
 
 
 -- VIEW
@@ -134,19 +222,32 @@ nodeIf name attrs children flag =
 view : Model -> Browser.Document Msg
 view model =
     let
-        postKeyed item =
+        itemKeyed item =
             ( String.fromInt (getItemId item), Lazy.lazy viewPost item )
+
+        page n =
+            H.li
+                [ A.class "paging__page"
+                , A.classList [("paging--active", model.page == n)]
+                , E.onClick (UpdatePage n)
+                ]
+                [ H.a [] [ H.text (String.fromInt (n + 1)) ]
+                ]
     in
     { title = model.title
     , body =
         [ H.node "link" [ A.rel "stylesheet", A.href "base.css" ] []
         , H.div [ A.class "page-wrapper" ]
-            [ H.h1 [ A.class "page-title" ] [ H.text model.title ]
+            [ H.h1 [ A.class "page-title" ]
+                [ H.a [ A.href hackernewsUrl, A.rel "noreferrer" ] [ H.text model.title ]
+                ]
             , nodeIf "div" [ A.class "error-message" ]
                 [ H.text (model.error |> Maybe.withDefault "") ]
                 (model.error /= Nothing)
-            , Keyed.node "ol" [ A.class "post-list" ]
-                (List.map postKeyed model.posts)
+            , Keyed.node "ol" [ A.class "post-list", A.start (model.page * itemsPerPage + 1) ]
+                (List.map itemKeyed model.items)
+            , H.ul [ A.class "paging" ]
+                (for page <| pagesCount model)
             ]
         ]
     }

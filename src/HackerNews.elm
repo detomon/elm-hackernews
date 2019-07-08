@@ -1,8 +1,8 @@
 module HackerNews exposing
     ( Msg (..), Item (..)
     , Story, Comment
-    , update
     , fetchTopStories
+    , fetchItems
     , itemId
     )
 
@@ -10,11 +10,6 @@ module HackerNews exposing
 {-| Fetch Hackernews stories and comments.
 
 @docs Msg, Item, Story, Comment
-
-
-# Update
-
-@docs update
 
 
 # Network
@@ -105,35 +100,6 @@ itemUrl id =
 -- MAIN
 
 
-{-| Update.
--}
-update : Msg -> Cmd Msg
-update msg =
-    case msg of
-        GotTopStories result ->
-            case result of
-                Ok ids ->
-                    ids
-                        |> List.map (\id -> fetchItem (GotItem id) id)
-                        |> Cmd.batch
-
-                Err error ->
-                    -- @todo: forward error
-                    Cmd.none
-
-        GotItem id result ->
-            case result of
-                Ok item ->
-                    Cmd.none
-
-                Err error ->
-                    -- @todo: forward error
-                    Cmd.none
-
-
--- HELPERS
-
-
 {-| Get ID of item.
 -}
 itemId : Item -> Int
@@ -147,20 +113,6 @@ itemId item =
 
 
 -- NETWORK
-
-
-{-| Fetch ID of top stories.
--}
-fetchTopStoriesGet : Int -> (Result Http.Error (List Int) -> Msg) -> Cmd Msg
-fetchTopStoriesGet limit msg =
-    let
-        limitList result =
-            msg <| Result.map (List.take limit) result
-    in
-    Http.get
-        { url = topStoriesUrl
-        , expect = Http.expectJson limitList decodeItemIds
-        }
 
 
 {-| Fetch item with ID.
@@ -225,6 +177,17 @@ decodeItem =
 
 {-| Fetch top stories with limit.
 -}
-fetchTopStories : Int -> Cmd Msg
-fetchTopStories limit =
-    fetchTopStoriesGet limit GotTopStories
+fetchTopStories : Cmd Msg
+fetchTopStories =
+    Http.get
+        { url = topStoriesUrl
+        , expect = Http.expectJson GotTopStories decodeItemIds
+        }
+
+{-| Fetch items eith given IDs.
+-}
+fetchItems : List Int -> Cmd Msg
+fetchItems ids =
+    ids
+        |> List.map (\id -> fetchItem (GotItem id) id)
+        |> Cmd.batch
