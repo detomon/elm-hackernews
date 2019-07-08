@@ -1,30 +1,41 @@
 module HackerNews exposing
-    ( Msg (..), Item (..)
+    ( Model, Item (..)
+    , Msg (..)
     , Story, Comment
+    , empty
+    , update
     , pageUrl
     , fetchTopStories
     , fetchItems
     , itemId
+    , pagesCount
+    , setPage
     )
 
 
 {-| Fetch Hackernews stories and comments.
 
-@docs Msg, Item, Story, Comment
+@docs Model, Item, Story, Comment, Msg
+
+
+# Model
+
+@docs empty, update, setPage
 
 
 # Network
 
-@docs fetchTopStories
+@docs fetchTopStories, fetchItems
 
 
 # Helpers
 
-@docs itemId
+@docs itemId, pageCount
 
 -}
 
 
+import Dict
 import Http
 import Json.Decode as D
 import Json.Decode.Pipeline as JP
@@ -39,6 +50,7 @@ import Time
 type Msg
     = GotTopStories (Result Http.Error (List Int))
     | GotItem Int (Result Http.Error Item)
+    --| UpdatePage Int
 
 
 {-| Story item.
@@ -72,6 +84,20 @@ type alias Comment =
 type Item
     = ItemStory Story
     | ItemComment Comment
+    | ItemPlaceholder Int
+    | ItemError Int String
+
+
+{-| Model.
+-}
+type alias Model =
+    { items : List Item
+    , itemIds : List Int
+    , itemsCache : Dict.Dict Int Item
+    , itemsPerPage : Int
+    , page : Int
+    , error : Maybe String
+    }
 
 
 -- API URLS
@@ -108,6 +134,88 @@ itemUrl id =
 -- MAIN
 
 
+{-| Get empty model.
+-}
+empty : Int -> Model
+empty itemsPerPage =
+    { items = []
+    , itemIds = []
+    , itemsCache = Dict.empty
+    , itemsPerPage = itemsPerPage
+    , page = 0
+    , error = Nothing
+    }
+
+
+{-| Replace placeholder item with given ID with new item.
+-}
+replacePlaceholder : Int -> Item -> List Item -> List Item
+replacePlaceholder id newItem =
+    List.map (\item ->
+        case item of
+            ItemPlaceholder placeholderId ->
+                if placeholderId == id then newItem else item
+
+            _ -> item
+    )
+
+
+{-| Create a paged list segment.
+-}
+paging : Int -> Int -> List a -> List a
+paging itemsPerPage page =
+    List.drop (itemsPerPage * page)
+        >> List.take itemsPerPage
+
+
+{-| Get number of pages.
+-}
+pagesCount : Model -> Int
+pagesCount model =
+    (List.length model.itemIds + model.itemsPerPage - 1) // model.itemsPerPage
+
+
+{-|
+-}
+resultErrorString : Http.Error -> String
+resultErrorString error =
+    case error of
+        Http.BadStatus status -> "BadStatus: " ++ String.fromInt status
+        Http.BadUrl url       -> "BadUrl: " ++ url
+        Http.Timeout          -> "Timeout"
+        Http.NetworkError     -> "NetworkError"
+        Http.BadBody str      -> "BadBody: " ++ str
+
+
+{-| Update.
+-}
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        GotTopStories result ->
+            case result of
+                Ok ids ->
+                    let
+                        (newModel, cmd) =
+                            setPage model.page { model | itemIds = ids }
+                    in
+                    ( newModel, cmd )
+
+                Err err ->
+                    ( { model | error = Just <| resultErrorString err }, Cmd.none )
+
+        GotItem id result ->
+            case result of
+                Ok item ->
+                    ( { model
+                        | items = replacePlaceholder id item model.items
+                        , itemsCache = Dict.insert id item model.itemsCache
+                    }, Cmd.none )
+
+                Err err ->
+                    ( { model | error = Just <| resultErrorString err }, Cmd.none )
+
+
 {-| Get ID of item.
 -}
 itemId : Item -> Int
@@ -118,6 +226,49 @@ itemId item =
 
         ItemComment comment ->
             comment.id
+
+        ItemPlaceholder id ->
+            id
+
+        ItemError id err ->
+            id
+
+setPage : Int -> Model -> ( Model, Cmd Msg )
+setPage page model =
+    let
+        getItem id =
+            case Dict.get id model.itemsCache of
+                Just item ->
+                    item
+
+                Nothing ->
+                    ItemPlaceholder id
+
+        itemList =
+            model.itemIds
+                |> paging model.itemsPerPage page
+                |> List.map getItem
+
+        isPlaceholder item =
+            case item of
+                ItemPlaceholder _ ->
+                    True
+
+                _ ->
+                    False
+
+        loadItems =
+            itemList
+                |> List.filter isPlaceholder 
+                |> List.map itemId
+
+        newModel =
+            { model
+                | page = page
+                , items = itemList
+            }
+    in
+    ( newModel, fetchItems loadItems )
 
 
 -- NETWORK
