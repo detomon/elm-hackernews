@@ -69,24 +69,20 @@ init flags =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        updateHackernews newModel (hackernews, cmd) =
+            ( { newModel | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
+    in
     case msg of
         -- fetch top stories after retrieving time zone
         GotTimeZone timeZone ->
             ( { model | timeZone = timeZone }, Cmd.map HackerNewsMsg HN.fetchTopStories )
 
         HackerNewsMsg submsg ->
-            let
-                (hackernews, submsg2) =
-                    HN.update submsg model.hackernews
-            in
-            ( { model | hackernews = hackernews }, Cmd.map HackerNewsMsg submsg2 )
+            HN.update submsg model.hackernews |> updateHackernews model
 
         UpdatePage page ->
-            let
-                (hackernews, submsg) =
-                    HN.setPage page model.hackernews
-            in
-            ( { model | hackernews = hackernews }, Cmd.map HackerNewsMsg submsg )
+            HN.setPage page model.hackernews |> updateHackernews model
 
 
 for : (Int -> a) -> Int -> List a
@@ -154,9 +150,6 @@ viewPost post =
         HN.ItemPlaceholder id ->
             viewPostTitle "post--placeholder" (" ") (" ") Nothing
 
-        HN.ItemError id error ->
-            viewPostTitle "post--error" error (" ") Nothing
-
         HN.ItemStory story ->
             let
                 infoText =
@@ -170,6 +163,13 @@ viewPost post =
         HN.ItemComment _ ->
             H.text ""
 
+        HN.ItemJob job ->
+            let
+                infoText =
+                    String.fromInt job.score
+                        ++ " points by " ++ job.by
+            in
+            viewPostTitle "" job.title infoText job.url
 
 viewPostTitle : String -> String -> String -> Maybe String -> H.Html Msg
 viewPostTitle class title info href =

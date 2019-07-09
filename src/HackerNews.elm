@@ -53,6 +53,18 @@ type Msg
     --| UpdatePage Int
 
 
+{-| Model.
+-}
+type alias Model =
+    { items : List Item
+    , itemIds : List Int
+    , itemsCache : Dict.Dict Int Item
+    , itemsPerPage : Int
+    , page : Int
+    , error : Maybe String
+    }
+
+
 {-| Story item.
 -}
 type alias Story =
@@ -79,25 +91,25 @@ type alias Comment =
     }
 
 
+{-| Job item.
+-}
+type alias Job =
+    { by : String
+    , id : Int
+    , score : Int
+    , time : Time.Posix
+    , title : String
+    , url : Maybe String
+    }
+
+
 {-| Allowed item types.
 -}
 type Item
     = ItemStory Story
     | ItemComment Comment
+    | ItemJob Job
     | ItemPlaceholder Int
-    | ItemError Int String
-
-
-{-| Model.
--}
-type alias Model =
-    { items : List Item
-    , itemIds : List Int
-    , itemsCache : Dict.Dict Int Item
-    , itemsPerPage : Int
-    , page : Int
-    , error : Maybe String
-    }
 
 
 -- API URLS
@@ -216,27 +228,29 @@ update msg model =
                     ( { model | error = Just <| resultErrorString err }, Cmd.none )
 
 
-{-| Get ID of item.
+{-| Get item ID.
 -}
 itemId : Item -> Int
 itemId item =
     case item of
-        ItemStory story ->
-            story.id
+        ItemStory { id } ->
+            id
 
-        ItemComment comment ->
-            comment.id
+        ItemComment { id } ->
+            id
+
+        ItemJob { id } ->
+            id
 
         ItemPlaceholder id ->
             id
 
-        ItemError id err ->
-            id
-
+{-| Set page.
+-}
 setPage : Int -> Model -> ( Model, Cmd Msg )
 setPage page model =
     let
-        getItem id =
+        cachedOrPlaceholderItem id =
             case Dict.get id model.itemsCache of
                 Just item ->
                     item
@@ -244,10 +258,10 @@ setPage page model =
                 Nothing ->
                     ItemPlaceholder id
 
-        itemList =
+        items =
             model.itemIds
                 |> paging model.itemsPerPage page
-                |> List.map getItem
+                |> List.map cachedOrPlaceholderItem
 
         isPlaceholder item =
             case item of
@@ -257,18 +271,18 @@ setPage page model =
                 _ ->
                     False
 
-        loadItems =
-            itemList
+        missingItemIds =
+            items
                 |> List.filter isPlaceholder 
                 |> List.map itemId
 
         newModel =
             { model
                 | page = page
-                , items = itemList
+                , items = items
             }
     in
-    ( newModel, fetchItems loadItems )
+    ( newModel, fetchItems missingItemIds )
 
 
 -- NETWORK
@@ -319,6 +333,16 @@ decodeItemWithType type_ =
                 |> JP.required "text" D.string
                 |> JP.custom (D.field "time" D.int |> D.map timeFromSeconds)
                 |> D.map ItemComment
+
+        "job" ->
+            D.succeed Job
+                |> JP.required "by" D.string
+                |> JP.required "id" D.int
+                |> JP.required "score" D.int
+                |> JP.required "time" (D.int |> D.map timeFromSeconds)
+                |> JP.required "title" D.string
+                |> JP.optional "url" (D.string |> D.map Just) Nothing
+                |> D.map ItemJob
 
         _ ->
             D.fail ("Unknown type '" ++ type_ ++ "'")
