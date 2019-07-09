@@ -309,31 +309,12 @@ itemKids model id =
 setPage : Int -> Model -> ( Model, Cmd Msg )
 setPage page model =
     let
-        cachedOrPlaceholderItem id =
-            case Dict.get id model.itemsCache of
-                Just item ->
-                    item
-
-                Nothing ->
-                    ItemPlaceholder id
-
-        pagedItems =
+        pagedItemsIds =
             model.allIitemIds
                 |> paging model.itemsPerPage page
-                |> List.map cachedOrPlaceholderItem
 
-        isPlaceholder item =
-            case item of
-                ItemPlaceholder _ ->
-                    True
-
-                _ ->
-                    False
-
-        missingItemIds =
-            pagedItems
-                |> List.filter isPlaceholder 
-                |> List.map itemId
+        ( pagedItems, cmd ) =
+            fetchItemsList model pagedItemsIds
 
         newModel =
             { model
@@ -341,7 +322,7 @@ setPage page model =
                 , pagedItems = pagedItems
             }
     in
-    ( newModel, fetchItems missingItemIds )
+    ( newModel, cmd )
 
 
 -- NETWORK
@@ -429,8 +410,11 @@ fetchItems =
     List.map (\id -> fetchItem (GotItem id) id)
         >> Cmd.batch
 
-fetchComments : Model -> ItemId -> ( Model, Cmd Msg )
-fetchComments model parentId =
+
+{-| Fetch cached items. Add placeholder if not found and add fetch command.
+-}
+fetchItemsList : Model -> List ItemId -> (List Item, Cmd Msg)
+fetchItemsList model itemIds =
     let
         cachedOrPlaceholderItem id =
             case Dict.get id model.itemsCache of
@@ -440,10 +424,6 @@ fetchComments model parentId =
                 Nothing ->
                     ItemPlaceholder id
 
-        comments =
-            itemKids model parentId
-                |> List.map cachedOrPlaceholderItem
-
         isPlaceholder item =
             case item of
                 ItemPlaceholder _ ->
@@ -452,18 +432,31 @@ fetchComments model parentId =
                 _ ->
                     False
 
+        itemList =
+            List.map cachedOrPlaceholderItem itemIds
+
         missingItemIds =
-            comments
+            itemList
                 |> List.filter isPlaceholder 
                 |> List.map itemId
+
+        cmd =
+            missingItemIds
+                |> List.map (\id -> fetchItem (GotItem id) id)
+                |> Cmd.batch
+    in
+    ( itemList, cmd )
+
+
+fetchComments : Model -> ItemId -> ( Model, Cmd Msg )
+fetchComments model parentId =
+    let
+        ( comments, cmd ) =
+            fetchItemsList model (itemKids model parentId)
 
         newModel =
             { model
                 | comments = comments
             }
-
-        cmd =
-            List.map (\subid -> fetchItem (GotItem subid) subid) missingItemIds
-                |> Cmd.batch
     in
     ( newModel, cmd )
