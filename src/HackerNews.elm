@@ -1,5 +1,5 @@
 module HackerNews exposing
-    ( Model, Item (..)
+    ( Model, Item (..), ItemId
     , Msg (..)
     , Story, Comment
     , empty
@@ -7,8 +7,11 @@ module HackerNews exposing
     , pageUrl
     , fetchTopStories
     , fetchItems
+    , fetchComments
     , itemId
     , pagesCount
+    , currentItems
+    , currentComments
     , setPage
     )
 
@@ -30,7 +33,7 @@ module HackerNews exposing
 
 # Helpers
 
-@docs itemId, pageCount
+@docs itemId, currentItems, pageCount
 
 -}
 
@@ -50,15 +53,21 @@ import Time
 type Msg
     = GotTopStories (Result Http.Error (List Int))
     | GotItem Int (Result Http.Error Item)
-    --| UpdatePage Int
+ 
+
+{-| Item ID type.
+-}
+type alias ItemId =
+    Int
 
 
 {-| Model.
 -}
 type alias Model =
-    { items : List Item
-    , itemIds : List Int
-    , itemsCache : Dict.Dict Int Item
+    { allIitemIds : List ItemId
+    , pagedItems : List Item
+    , comments : List Item
+    , itemsCache : Dict.Dict ItemId Item
     , itemsPerPage : Int
     , page : Int
     , error : Maybe String
@@ -70,7 +79,7 @@ type alias Model =
 type alias Story =
     { by : String
     , descendants : Int
-    , id : Int
+    , id : ItemId
     , kids : List Int
     , score : Int
     , time : Time.Posix
@@ -83,11 +92,12 @@ type alias Story =
 -}
 type alias Comment =
     { by : String
-    , id : Int
+    , id : ItemId
     , kids : List Int
     , parent : Int
     , text : String
     , time : Time.Posix
+    , deleted : Bool
     }
 
 
@@ -95,7 +105,7 @@ type alias Comment =
 -}
 type alias Job =
     { by : String
-    , id : Int
+    , id : ItemId
     , score : Int
     , time : Time.Posix
     , title : String
@@ -106,10 +116,10 @@ type alias Job =
 {-| Allowed item types.
 -}
 type Item
-    = ItemStory Story
+    = ItemPlaceholder ItemId
+    | ItemStory Story
     | ItemComment Comment
     | ItemJob Job
-    | ItemPlaceholder Int
 
 
 -- API URLS
@@ -138,7 +148,7 @@ topStoriesUrl =
 
 {-| Make item URL with ID.
 -}
-itemUrl : Int -> String
+itemUrl : ItemId -> String
 itemUrl id =
     baseUrl ++ "/item/" ++ String.fromInt id ++ ".json"
 
@@ -150,8 +160,9 @@ itemUrl id =
 -}
 empty : Int -> Model
 empty itemsPerPage =
-    { items = []
-    , itemIds = []
+    { allIitemIds = []
+    , pagedItems = []
+    , comments = []
     , itemsCache = Dict.empty
     , itemsPerPage = itemsPerPage
     , page = 0
@@ -161,7 +172,7 @@ empty itemsPerPage =
 
 {-| Replace placeholder item with given ID with new item.
 -}
-replacePlaceholder : Int -> Item -> List Item -> List Item
+replacePlaceholder : ItemId -> Item -> List Item -> List Item
 replacePlaceholder id newItem =
     List.map (\item ->
         case item of
@@ -184,7 +195,7 @@ paging itemsPerPage page =
 -}
 pagesCount : Model -> Int
 pagesCount model =
-    (List.length model.itemIds + model.itemsPerPage - 1) // model.itemsPerPage
+    (List.length model.allIitemIds + model.itemsPerPage - 1) // model.itemsPerPage
 
 
 {-|
@@ -203,36 +214,53 @@ resultErrorString error =
 -}
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        setError err =
+            ( { model | error = Just <| resultErrorString err }, Cmd.none )
+    in
     case msg of
         GotTopStories result ->
             case result of
                 Ok ids ->
-                    let
-                        (newModel, cmd) =
-                            setPage model.page { model | itemIds = ids }
-                    in
-                    ( newModel, cmd )
+                    setPage model.page { model | allIitemIds = ids }
 
                 Err err ->
-                    ( { model | error = Just <| resultErrorString err }, Cmd.none )
+                    setError err
 
         GotItem id result ->
             case result of
                 Ok item ->
-                    ( { model
-                        | items = replacePlaceholder id item model.items
-                        , itemsCache = Dict.insert id item model.itemsCache
-                    }, Cmd.none )
+                    let
+                        removeDeletedComment comment =
+                            case comment of
+                                ItemComment { deleted } ->
+                                    not deleted
+
+                                _ ->
+                                    True
+
+                        newModel =
+                            { model
+                                | pagedItems = replacePlaceholder id item model.pagedItems
+                                , comments = replacePlaceholder id item model.comments
+                                    |> List.filter removeDeletedComment
+                                , itemsCache = Dict.insert id item model.itemsCache
+                            }
+                    in
+                    ( newModel, Cmd.none )
 
                 Err err ->
-                    ( { model | error = Just <| resultErrorString err }, Cmd.none )
+                    setError err
 
 
 {-| Get item ID.
 -}
-itemId : Item -> Int
+itemId : Item -> ItemId
 itemId item =
     case item of
+        ItemPlaceholder id ->
+            id
+
         ItemStory { id } ->
             id
 
@@ -242,8 +270,39 @@ itemId item =
         ItemJob { id } ->
             id
 
-        ItemPlaceholder id ->
-            id
+
+{-| Get paged items.
+-}
+currentItems : Model -> List Item
+currentItems { pagedItems } =
+    pagedItems
+
+
+{-| Get current comments.
+-}
+currentComments : Model -> List Item
+currentComments { comments } =
+    comments
+
+
+{-| Get kids IDs using model cache.
+-}
+itemKids : Model -> ItemId -> List ItemId
+itemKids model id =
+    case Dict.get id model.itemsCache of
+        Just item ->
+            case item of
+                ItemStory { kids } ->
+                    kids
+
+                ItemComment { kids } ->
+                    kids
+
+                _ ->
+                    []
+
+        Nothing ->
+            []
 
 {-| Set page.
 -}
@@ -258,8 +317,8 @@ setPage page model =
                 Nothing ->
                     ItemPlaceholder id
 
-        items =
-            model.itemIds
+        pagedItems =
+            model.allIitemIds
                 |> paging model.itemsPerPage page
                 |> List.map cachedOrPlaceholderItem
 
@@ -272,14 +331,14 @@ setPage page model =
                     False
 
         missingItemIds =
-            items
+            pagedItems
                 |> List.filter isPlaceholder 
                 |> List.map itemId
 
         newModel =
             { model
                 | page = page
-                , items = items
+                , pagedItems = pagedItems
             }
     in
     ( newModel, fetchItems missingItemIds )
@@ -290,7 +349,7 @@ setPage page model =
 
 {-| Fetch item with ID.
 -}
-fetchItem : (Result Http.Error Item -> Msg) -> Int -> Cmd Msg
+fetchItem : (Result Http.Error Item -> Msg) -> ItemId -> Cmd Msg
 fetchItem msg id =
     let
         decodeItem =
@@ -326,12 +385,13 @@ decodeItemWithType type_ =
 
         "comment" ->
             D.succeed Comment
-                |> JP.required "by" D.string
+                |> JP.optional "by" D.string ""
                 |> JP.required "id" D.int
                 |> JP.optional "kids" (D.list D.int) []
                 |> JP.required "parent" D.int
-                |> JP.required "text" D.string
+                |> JP.optional "text" D.string ""
                 |> JP.custom (D.field "time" D.int |> D.map timeFromSeconds)
+                |> JP.optional "deleted" D.bool False
                 |> D.map ItemComment
 
         "job" ->
@@ -364,7 +424,46 @@ fetchTopStories =
 
 {-| Fetch items with given IDs.
 -}
-fetchItems : List Int -> Cmd Msg
+fetchItems : List ItemId -> Cmd Msg
 fetchItems =
     List.map (\id -> fetchItem (GotItem id) id)
         >> Cmd.batch
+
+fetchComments : Model -> ItemId -> ( Model, Cmd Msg )
+fetchComments model parentId =
+    let
+        cachedOrPlaceholderItem id =
+            case Dict.get id model.itemsCache of
+                Just item ->
+                    item
+
+                Nothing ->
+                    ItemPlaceholder id
+
+        comments =
+            itemKids model parentId
+                |> List.map cachedOrPlaceholderItem
+
+        isPlaceholder item =
+            case item of
+                ItemPlaceholder _ ->
+                    True
+
+                _ ->
+                    False
+
+        missingItemIds =
+            comments
+                |> List.filter isPlaceholder 
+                |> List.map itemId
+
+        newModel =
+            { model
+                | comments = comments
+            }
+
+        cmd =
+            List.map (\subid -> fetchItem (GotItem subid) subid) missingItemIds
+                |> Cmd.batch
+    in
+    ( newModel, cmd )

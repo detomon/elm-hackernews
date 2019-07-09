@@ -160,7 +160,7 @@ thead {
 }
 
 .paging__page {
-	display: inline;
+	display: inline-block;
 }
 
 .paging__page.paging--active {
@@ -170,4 +170,15 @@ thead {
 .paging__page a {
 	cursor: pointer;
 	padding: 0 0.5em;
+}
+
+/* -------------------------------------------------------------------------- */
+
+.comments-wrapper {
+	padding: 1em;
+	border: 1px solid #d0d0d0;
+}
+
+.comments-wrapper a {
+	text-decoration: underline;
 }

@@ -11,6 +11,9 @@ import Html.Keyed as Keyed
 import Html.Lazy as Lazy
 import Http
 import Json.Decode as Decode
+import List.Extra exposing (initialize)
+import Markdown
+import Markdown.Config as MarkdownConfig
 import Task
 import Time
 
@@ -32,6 +35,7 @@ type Msg
     = GotTimeZone Time.Zone
     | HackerNewsMsg HN.Msg
     | UpdatePage Int
+    | ShowComments HN.ItemId
 
 
 -- SETTINGS
@@ -84,17 +88,8 @@ update msg model =
         UpdatePage page ->
             HN.setPage page model.hackernews |> updateHackernews model
 
-
-for : (Int -> a) -> Int -> List a
-for fn count =
-    let
-        item n =
-            if n < count then
-                fn n :: item (n + 1)
-            else
-                []
-    in
-    item 0
+        ShowComments itemId ->
+            HN.fetchComments model.hackernews itemId |> updateHackernews model
 
 
 -- VIEW
@@ -136,9 +131,13 @@ view model =
                 [ H.text (model.hackernews.error |> Maybe.withDefault "") ]
                 (model.hackernews.error /= Nothing)
             , Keyed.node "ol" [ A.class "post-list", A.start (model.hackernews.page * itemsPerPage + 1) ]
-                (List.map itemKeyed model.hackernews.items)
+                (List.map itemKeyed (HN.currentItems model.hackernews))
             , H.ul [ A.class "paging" ]
-                (for page <| HN.pagesCount model.hackernews)
+                (initialize (HN.pagesCount model.hackernews) page)
+            , H.div [ A.class "comments-wrapper" ]
+                [ Keyed.node "ul" [ A.class "comments-list" ]
+                    (List.map itemKeyed (HN.currentComments model.hackernews))
+                ]
             ]
         ]
     }
@@ -146,22 +145,45 @@ view model =
 
 viewPost : HN.Item -> H.Html Msg
 viewPost post =
+    let
+        markdownOptions =
+            let
+                options =
+                    MarkdownConfig.defaultOptions
+            in
+            { options
+                | rawHtml = MarkdownConfig.ParseUnsafe
+            }
+    in
     case post of
         HN.ItemPlaceholder id ->
-            viewPostTitle "post--placeholder" (" ") (" ") Nothing
+            viewPostTitle "post--placeholder" (" ") [ H.text (" ") ] Nothing
 
         HN.ItemStory story ->
             let
-                infoText =
-                    String.fromInt story.score
-                        ++ " points by " ++ story.by ++ " | "
-                        ++ String.fromInt story.descendants
-                        ++ " comments"
+                info =
+                    [ H.text (String.fromInt story.score
+                        ++ " points by " ++ story.by ++ " | ")
+                    , H.a [ E.onClick (ShowComments story.id) ]
+                        [ H.text (String.fromInt story.descendants
+                            ++ " comments")
+                        ]
+                    ]
             in
-            viewPostTitle "" story.title infoText story.url
+            viewPostTitle "" story.title info story.url
 
-        HN.ItemComment _ ->
-            H.text ""
+        HN.ItemComment comment ->
+            let
+                info =
+                    [ H.text ("by " ++ comment.by ++ " | ")
+                    ]
+
+                text =
+                    "<div>" ++ comment.text ++ "</div>"
+
+            in
+            H.li []
+                (Markdown.toHtml (Just markdownOptions) text)
 
         HN.ItemJob job ->
             let
@@ -169,9 +191,10 @@ viewPost post =
                     String.fromInt job.score
                         ++ " points by " ++ job.by
             in
-            viewPostTitle "" job.title infoText job.url
+            viewPostTitle "" job.title [ H.text infoText ] job.url
 
-viewPostTitle : String -> String -> String -> Maybe String -> H.Html Msg
+
+viewPostTitle : String -> String -> List (H.Html Msg) -> Maybe String -> H.Html Msg
 viewPostTitle class title info href =
     H.li [ A.class "post", A.class class ]
         [ H.span [ A.class "post-title" ]
@@ -179,6 +202,5 @@ viewPostTitle class title info href =
                 Nothing  -> H.text title
                 Just url -> H.a [ A.href url, A.rel "noreferrer" ] [ H.text title ]
             ]
-        , H.span [ A.class "post-info" ]
-            [ H.text info ]
+        , H.span [ A.class "post-info" ] info
         ]
