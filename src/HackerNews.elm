@@ -43,6 +43,7 @@ import Dict
 import Http
 import Json.Decode as D
 import Json.Decode.Pipeline as JP
+import MultiwayTree as MT
 import Time
 
 
@@ -67,7 +68,7 @@ type alias ItemId =
 type alias Model =
     { allIitemIds : List ItemId
     , pagedItems : List Item
-    , comments : List Item
+    , comments : MT.Tree Item
     , itemsCache : Dict.Dict ItemId Item
     , itemsPerPage : Int
     , page : Int
@@ -95,7 +96,7 @@ type alias Comment =
     { by : String
     , id : ItemId
     , kids : List Int
-    , parent : Int
+    , parent : ItemId
     , text : String
     , time : Time.Posix
     , deleted : Bool
@@ -163,25 +164,12 @@ empty : Int -> Model
 empty itemsPerPage =
     { allIitemIds = []
     , pagedItems = []
-    , comments = []
+    , comments = MT.Tree (ItemPlaceholder 0) []
     , itemsCache = Dict.empty
     , itemsPerPage = itemsPerPage
     , page = 0
     , error = Nothing
     }
-
-
-{-| Replace placeholder item with given ID with new item.
--}
-replacePlaceholder : ItemId -> Item -> List Item -> List Item
-replacePlaceholder id newItem =
-    List.map (\item ->
-        case item of
-            ItemPlaceholder placeholderId ->
-                if placeholderId == id then newItem else item
-
-            _ -> item
-    )
 
 
 {-| Create a paged list segment.
@@ -216,6 +204,15 @@ resultErrorString error =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
+        replacePlaceholder map id newItem =
+            map (\item ->
+                case item of
+                    ItemPlaceholder placeholderId ->
+                        if placeholderId == id then newItem else item
+
+                    _ -> item
+            )
+
         setError err =
             ( { model | error = Just <| resultErrorString err }, Cmd.none )
     in
@@ -242,13 +239,22 @@ update msg model =
 
                         newModel =
                             { model
-                                | pagedItems = replacePlaceholder id item model.pagedItems
-                                , comments = replacePlaceholder id item model.comments
-                                    |> List.filter removeDeletedComment
+                                | pagedItems = replacePlaceholder List.map id item model.pagedItems
+                                , comments = replacePlaceholder MT.map id item model.comments
+                                    |> MT.filter removeDeletedComment
+                                    |> Maybe.withDefault (MT.Tree (ItemPlaceholder 0) [])
                                 , itemsCache = Dict.insert id item model.itemsCache
                             }
+
+                        loadChildComments =
+                            case item of
+                                ItemComment { kids } ->
+                                    fetchItems kids
+
+                                _ ->
+                                    Cmd.none
                     in
-                    ( newModel, Cmd.none )
+                    ( newModel, loadChildComments )
 
                 Err err ->
                     setError err
@@ -281,7 +287,7 @@ currentItems { pagedItems } =
 
 {-| Get current comments.
 -}
-currentComments : Model -> List Item
+currentComments : Model -> MT.Tree Item
 currentComments { comments } =
     comments
 
@@ -453,12 +459,20 @@ getItems model itemIds =
 fetchComments : Model -> ItemId -> ( Model, Cmd Msg )
 fetchComments model parentId =
     let
+        item =
+            case Dict.get parentId model.itemsCache of
+                Just i ->
+                    i
+
+                Nothing ->
+                    ItemPlaceholder 0
+
         ( comments, cmd ) =
             getItems model (itemKids model parentId)
 
         newModel =
             { model
-                | comments = comments
+                | comments = MT.Tree item (List.map (\i -> MT.Tree i []) comments)
             }
     in
     ( newModel, cmd )

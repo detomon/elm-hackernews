@@ -11,9 +11,10 @@ import Html.Keyed as Keyed
 import Html.Lazy as Lazy
 import Http
 import Json.Decode as Decode
-import List.Extra exposing (initialize)
+import List.Extra as ListExtra
 import Markdown
 import Markdown.Config as MarkdownConfig
+import MultiwayTree as MT
 import Task
 import Time
 
@@ -105,20 +106,17 @@ nodeIf name attrs children flag =
         H.text ""
 
 
+itemKeyed : HN.Item -> (String, H.Html Msg)
+itemKeyed item =
+    ( String.fromInt (HN.itemId item), Lazy.lazy viewPost item )
+
+
 view : Model -> Browser.Document Msg
 view model =
     let
-        itemKeyed item =
-            ( String.fromInt (HN.itemId item), Lazy.lazy viewPost item )
-
-        page n =
-            H.li
-                [ A.class "paging__page"
-                , A.classList [("paging--active", model.hackernews.page == n)]
-                , E.onClick (UpdatePage n)
-                ]
-                [ H.a [] [ H.text (String.fromInt (n + 1)) ]
-                ]
+        items =
+            HN.currentItems model.hackernews
+                |> List.map itemKeyed
     in
     { title = model.title
     , body =
@@ -130,17 +128,46 @@ view model =
             , nodeIf "div" [ A.class "error-message" ]
                 [ H.text (model.hackernews.error |> Maybe.withDefault "") ]
                 (model.hackernews.error /= Nothing)
-            , Keyed.node "ol" [ A.class "post-list", A.start (model.hackernews.page * itemsPerPage + 1) ]
-                (List.map itemKeyed (HN.currentItems model.hackernews))
-            , H.ul [ A.class "paging" ]
-                (initialize (HN.pagesCount model.hackernews) page)
-            , H.div [ A.class "comments-wrapper" ]
-                [ Keyed.node "ul" [ A.class "comments-list" ]
-                    (List.map itemKeyed (HN.currentComments model.hackernews))
+            , Keyed.node "ol"
+                [ A.class "post-list"
+                , A.start (model.hackernews.page * itemsPerPage + 1)
                 ]
+                items
+            , viewPaging model
+            , viewComments model
             ]
         ]
     }
+
+
+viewPaging : Model -> H.Html Msg
+viewPaging model =
+    let
+        pagesCount =
+            HN.pagesCount model.hackernews
+
+        pageItem n =
+            H.li
+                [ A.class "paging__page"
+                , A.classList [("paging--active", model.hackernews.page == n)]
+                , E.onClick (UpdatePage n)
+                ]
+                [ H.a [] [ H.text (String.fromInt (n + 1)) ]
+                ]
+    in
+    H.ul [ A.class "paging" ] (ListExtra.initialize pagesCount pageItem)
+
+
+viewComments : Model -> H.Html Msg
+viewComments model =
+    let
+        comments =
+            HN.currentComments model.hackernews
+                |> MT.flatten
+                |> List.map itemKeyed
+    in
+    H.div [ A.class "comments-wrapper" ]
+        [ Keyed.node "ul" [ A.class "comments-list" ] comments ]
 
 
 viewPost : HN.Item -> H.Html Msg
