@@ -1,18 +1,19 @@
 module HackerNews exposing
-    ( Model, Item (..), ItemId
+    ( Model, Item (..)
     , Msg (..)
     , Story, Comment
+    , ItemId
     , empty
     , update
-    , pageUrl
+    , setPage
+    , currentItems
+    , currentComments
+    , pagesCount
     , fetchTopStories
     , fetchItems
     , fetchComments
+    , pageUrl
     , itemId
-    , pagesCount
-    , currentItems
-    , currentComments
-    , setPage
     )
 
 
@@ -23,17 +24,17 @@ module HackerNews exposing
 
 # Model
 
-@docs empty, update, setPage
+@docs empty, update, setPage, currentItems, currentComments, pagesCount
 
 
 # Network
 
-@docs fetchTopStories, fetchItems
+@docs fetchTopStories, fetchItems, fetchComments
 
 
 # Helpers
 
-@docs itemId, currentItems, pageCount
+@docs itemId, pageUrl
 
 -}
 
@@ -288,8 +289,8 @@ currentComments { comments } =
 {-| Get kids IDs using model cache.
 -}
 itemKids : Model -> ItemId -> List ItemId
-itemKids model id =
-    case Dict.get id model.itemsCache of
+itemKids { itemsCache } id =
+    case Dict.get id itemsCache of
         Just item ->
             case item of
                 ItemStory { kids } ->
@@ -314,7 +315,7 @@ setPage page model =
                 |> paging model.itemsPerPage page
 
         ( pagedItems, cmd ) =
-            fetchItemsList model pagedItemsIds
+            getItems model pagedItemsIds
 
         newModel =
             { model
@@ -408,13 +409,14 @@ fetchTopStories =
 fetchItems : List ItemId -> Cmd Msg
 fetchItems =
     List.map (\id -> fetchItem (GotItem id) id)
+        >> List.reverse -- reverse; commands seem to be started backwards
         >> Cmd.batch
 
 
 {-| Fetch cached items. Add placeholder if not found and add fetch command.
 -}
-fetchItemsList : Model -> List ItemId -> (List Item, Cmd Msg)
-fetchItemsList model itemIds =
+getItems : Model -> List ItemId -> (List Item, Cmd Msg)
+getItems model itemIds =
     let
         cachedOrPlaceholderItem id =
             case Dict.get id model.itemsCache of
@@ -441,18 +443,18 @@ fetchItemsList model itemIds =
                 |> List.map itemId
 
         cmd =
-            missingItemIds
-                |> List.map (\id -> fetchItem (GotItem id) id)
-                |> Cmd.batch
+            fetchItems missingItemIds
     in
     ( itemList, cmd )
 
 
+{-| Fetch comments from (already loaded) parent item.
+-}
 fetchComments : Model -> ItemId -> ( Model, Cmd Msg )
 fetchComments model parentId =
     let
         ( comments, cmd ) =
-            fetchItemsList model (itemKids model parentId)
+            getItems model (itemKids model parentId)
 
         newModel =
             { model
