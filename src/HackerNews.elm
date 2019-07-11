@@ -1,25 +1,14 @@
 module HackerNews exposing
-    ( Model, Item (..)
-    , Msg (..)
-    , Story, Comment
+    ( Model, Item(..), Story, Comment, Msg(..)
+    , empty, update, setPage, currentItems, currentComments, pagesCount
+    , fetchTopStories, fetchItems, fetchComments
+    , itemId, pageUrl
     , ItemId
-    , empty
-    , update
-    , setPage
-    , currentItems
-    , currentComments
-    , pagesCount
-    , fetchTopStories
-    , fetchItems
-    , fetchComments
-    , pageUrl
-    , itemId
     )
-
 
 {-| Fetch Hackernews stories and comments.
 
-@docs Model, Item, Story, Comment, Msg
+@docs Model, Item, ItemId, Story, Comment, Msg
 
 
 # Model
@@ -38,13 +27,13 @@ module HackerNews exposing
 
 -}
 
-
 import Dict
 import Http
 import Json.Decode as D
 import Json.Decode.Pipeline as JP
 import MultiwayTree as MT
 import Time
+
 
 
 -- TYPES
@@ -55,7 +44,7 @@ import Time
 type Msg
     = GotTopStories (Result Http.Error (List Int))
     | GotItem Int (Result Http.Error Item)
- 
+
 
 {-| Item ID type.
 -}
@@ -124,6 +113,7 @@ type Item
     | ItemJob Job
 
 
+
 -- API URLS
 
 
@@ -153,6 +143,7 @@ topStoriesUrl =
 itemUrl : ItemId -> String
 itemUrl id =
     baseUrl ++ "/item/" ++ String.fromInt id ++ ".json"
+
 
 
 -- MAIN
@@ -187,16 +178,25 @@ pagesCount model =
     (List.length model.allIitemIds + model.itemsPerPage - 1) // model.itemsPerPage
 
 
-{-|
+{-| Get error string from Http error.
 -}
 resultErrorString : Http.Error -> String
 resultErrorString error =
     case error of
-        Http.BadStatus status -> "BadStatus: " ++ String.fromInt status
-        Http.BadUrl url       -> "BadUrl: " ++ url
-        Http.Timeout          -> "Timeout"
-        Http.NetworkError     -> "NetworkError"
-        Http.BadBody str      -> "BadBody: " ++ str
+        Http.BadStatus status ->
+            "BadStatus: " ++ String.fromInt status
+
+        Http.BadUrl url ->
+            "BadUrl: " ++ url
+
+        Http.Timeout ->
+            "Timeout"
+
+        Http.NetworkError ->
+            "NetworkError"
+
+        Http.BadBody str ->
+            "BadBody: " ++ str
 
 
 {-| Update.
@@ -205,13 +205,19 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         replacePlaceholder map id newItem =
-            map (\item ->
-                case item of
-                    ItemPlaceholder placeholderId ->
-                        if placeholderId == id then newItem else item
+            map
+                (\item ->
+                    case item of
+                        ItemPlaceholder placeholderId ->
+                            if placeholderId == id then
+                                newItem
 
-                    _ -> item
-            )
+                            else
+                                item
+
+                        _ ->
+                            item
+                )
 
         setError err =
             ( { model | error = Just <| resultErrorString err }, Cmd.none )
@@ -240,9 +246,10 @@ update msg model =
                         newModel =
                             { model
                                 | pagedItems = replacePlaceholder List.map id item model.pagedItems
-                                , comments = replacePlaceholder MT.map id item model.comments
-                                    |> MT.filter removeDeletedComment
-                                    |> Maybe.withDefault (MT.Tree (ItemPlaceholder 0) [])
+                                , comments =
+                                    replacePlaceholder MT.map id item model.comments
+                                        |> MT.filter removeDeletedComment
+                                        |> Maybe.withDefault (MT.Tree (ItemPlaceholder 0) [])
                                 , itemsCache = Dict.insert id item model.itemsCache
                             }
 
@@ -311,6 +318,7 @@ itemKids { itemsCache } id =
         Nothing ->
             []
 
+
 {-| Set page.
 -}
 setPage : Int -> Model -> ( Model, Cmd Msg )
@@ -330,6 +338,7 @@ setPage page model =
             }
     in
     ( newModel, cmd )
+
 
 
 -- NETWORK
@@ -412,16 +421,17 @@ fetchTopStories =
 
 {-| Fetch items with given IDs.
 -}
-fetchItems : List ItemId -> Cmd Msg
+fetchItems : List ItemId ->  Cmd Msg
 fetchItems =
     List.map (\id -> fetchItem (GotItem id) id)
-        >> List.reverse -- reverse; commands seem to be started backwards
+        >> List.reverse
+        -- reverse; commands seem to be started backwards
         >> Cmd.batch
 
 
 {-| Fetch cached items. Add placeholder if not found and add fetch command.
 -}
-getItems : Model -> List ItemId -> (List Item, Cmd Msg)
+getItems : Model -> List ItemId -> ( List Item, Cmd Msg )
 getItems model itemIds =
     let
         cachedOrPlaceholderItem id =
@@ -445,7 +455,7 @@ getItems model itemIds =
 
         missingItemIds =
             itemList
-                |> List.filter isPlaceholder 
+                |> List.filter isPlaceholder
                 |> List.map itemId
 
         cmd =

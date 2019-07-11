@@ -1,6 +1,5 @@
 module Main exposing (main)
 
-
 import Browser
 import Dict
 import HackerNews as HN
@@ -39,12 +38,14 @@ type Msg
     | ShowComments HN.ItemId
 
 
+
 -- SETTINGS
 
 
 itemsPerPage : Int
 itemsPerPage =
     30
+
 
 
 -- MAIN
@@ -60,7 +61,7 @@ main =
         }
 
 
-init : () -> (Model, Cmd Msg)
+init : () -> ( Model, Cmd Msg )
 init flags =
     let
         model =
@@ -75,7 +76,7 @@ init flags =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        updateHackernews newModel (hackernews, cmd) =
+        updateHackernews newModel ( hackernews, cmd ) =
             ( { newModel | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
     in
     case msg of
@@ -93,6 +94,7 @@ update msg model =
             HN.fetchComments model.hackernews itemId |> updateHackernews model
 
 
+
 -- VIEW
 
 
@@ -102,21 +104,31 @@ nodeIf : String -> List (H.Attribute msg) -> List (H.Html msg) -> Bool -> H.Html
 nodeIf name attrs children flag =
     if flag then
         H.node name attrs children
+
     else
         H.text ""
 
 
-itemKeyed : HN.Item -> (String, H.Html Msg)
-itemKeyed item =
+{-| Make keyed item.
+-}
+keyedItem : HN.Item -> ( String, H.Html Msg )
+keyedItem item =
     ( String.fromInt (HN.itemId item), Lazy.lazy viewPost item )
 
 
+{-| View.
+-}
 view : Model -> Browser.Document Msg
 view model =
     let
         items =
             HN.currentItems model.hackernews
-                |> List.map itemKeyed
+
+        itemStart =
+            model.hackernews.page * itemsPerPage + 1
+
+        pagesCount =
+            HN.pagesCount model.hackernews
     in
     { title = model.title
     , body =
@@ -125,51 +137,76 @@ view model =
             [ H.h1 [ A.class "page-title" ]
                 [ H.a [ A.href HN.pageUrl, A.rel "noreferrer" ] [ H.text model.title ]
                 ]
-            , nodeIf "div" [ A.class "error-message" ]
-                [ H.text (model.hackernews.error |> Maybe.withDefault "") ]
-                (model.hackernews.error /= Nothing)
-            , Keyed.node "ol"
-                [ A.class "post-list"
-                , A.start (model.hackernews.page * itemsPerPage + 1)
-                ]
-                items
-            , viewPaging model
-            , viewComments model
+            , Lazy.lazy viewError model.hackernews.error
+            , Lazy.lazy2 viewItems items itemStart
+            , Lazy.lazy2 viewPaging pagesCount model.hackernews.page
+            , Lazy.lazy viewComments (HN.currentComments model.hackernews)
             ]
         ]
     }
 
 
-viewPaging : Model -> H.Html Msg
-viewPaging model =
+{-| View error.
+-}
+viewError : Maybe String -> H.Html Msg
+viewError error =
     let
-        pagesCount =
-            HN.pagesCount model.hackernews
+        text =
+            error |> Maybe.withDefault ""
+    in
+    nodeIf "div"
+        [ A.class "error-message" ]
+        [ H.text text ]
+        (error /= Nothing)
 
-        pageItem n =
+
+{-| Post items.
+-}
+viewItems : List HN.Item -> Int -> H.Html Msg
+viewItems items start =
+    Keyed.node "ol"
+        [ A.class "post-list"
+        , A.start start
+        ]
+        (List.map keyedItem items)
+
+
+{-| Paging.
+-}
+viewPaging : Int -> Int -> H.Html Msg
+viewPaging count page =
+    let
+        listItem n =
             H.li
                 [ A.class "paging__page"
-                , A.classList [("paging--active", model.hackernews.page == n)]
+                , A.classList [ ( "paging--active", page == n ) ]
                 , E.onClick (UpdatePage n)
                 ]
                 [ H.a [] [ H.text (String.fromInt (n + 1)) ]
                 ]
+
+        pages =
+            ListExtra.initialize count listItem
     in
-    H.ul [ A.class "paging" ] (ListExtra.initialize pagesCount pageItem)
+    H.ul [ A.class "paging" ] pages
 
 
-viewComments : Model -> H.Html Msg
-viewComments model =
+{-| Comments.
+-}
+viewComments : MT.Tree HN.Item -> H.Html Msg
+viewComments comments =
     let
-        comments =
-            HN.currentComments model.hackernews
+        posts =
+            comments
                 |> MT.flatten
-                |> List.map itemKeyed
+                |> List.map keyedItem
     in
     H.div [ A.class "comments-wrapper" ]
-        [ Keyed.node "ul" [ A.class "comments-list" ] comments ]
+        [ Keyed.node "ul" [ A.class "comments-list" ] posts ]
 
 
+{-| Post.
+-}
 viewPost : HN.Item -> H.Html Msg
 viewPost post =
     let
@@ -178,23 +215,23 @@ viewPost post =
                 options =
                     MarkdownConfig.defaultOptions
             in
-            { options
-                | rawHtml = MarkdownConfig.ParseUnsafe
-            }
+            { options | rawHtml = MarkdownConfig.ParseUnsafe }
     in
     case post of
         HN.ItemPlaceholder id ->
-            viewPostTitle "post--placeholder" (" ") [ H.text (" ") ] Nothing
+            viewPostTitle "post--placeholder" " " [ H.text " " ] Nothing
 
         HN.ItemStory story ->
             let
+                text =
+                    String.fromInt story.score ++ " points by " ++ story.by ++ " | "
+
+                comments =
+                    String.fromInt story.descendants ++ " comments"
+
                 info =
-                    [ H.text (String.fromInt story.score
-                        ++ " points by " ++ story.by ++ " | ")
-                    , H.a [ E.onClick (ShowComments story.id) ]
-                        [ H.text (String.fromInt story.descendants
-                            ++ " comments")
-                        ]
+                    [ H.text text
+                    , H.a [ E.onClick (ShowComments story.id) ] [ H.text comments ]
                     ]
             in
             viewPostTitle "" story.title info story.url
@@ -202,32 +239,38 @@ viewPost post =
         HN.ItemComment comment ->
             let
                 info =
-                    [ H.text ("by " ++ comment.by ++ " | ")
-                    ]
+                    [ H.text ("by " ++ comment.by ++ " | ") ]
 
                 text =
                     "<div>" ++ comment.text ++ "</div>"
 
+                markdown =
+                    Markdown.toHtml (Just markdownOptions) text
             in
-            H.li []
-                (Markdown.toHtml (Just markdownOptions) text)
+            H.li [] markdown
 
         HN.ItemJob job ->
             let
                 infoText =
-                    String.fromInt job.score
-                        ++ " points by " ++ job.by
+                    String.fromInt job.score ++ " points by " ++ job.by
             in
             viewPostTitle "" job.title [ H.text infoText ] job.url
 
 
+{-| Post title.
+-}
 viewPostTitle : String -> String -> List (H.Html Msg) -> Maybe String -> H.Html Msg
 viewPostTitle class title info href =
+    let
+        titleNode =
+            case href of
+                Nothing ->
+                    H.text title
+
+                Just url ->
+                    H.a [ A.href url, A.rel "noreferrer" ] [ H.text title ]
+    in
     H.li [ A.class "post", A.class class ]
-        [ H.span [ A.class "post-title" ]
-            [ case href of
-                Nothing  -> H.text title
-                Just url -> H.a [ A.href url, A.rel "noreferrer" ] [ H.text title ]
-            ]
+        [ H.span [ A.class "post-title" ] [ titleNode ]
         , H.span [ A.class "post-info" ] info
         ]

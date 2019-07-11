@@ -7,7 +7,7 @@ main: \
 	elm.min.js
 
 elm.js: src/Main.elm
-	@elm make $(ELM_FLAGS) $< --output=$@
+	elm make $(ELM_FLAGS) $< --output=$@
 
 elm.min.js: elm.js
 	$(UGLIFY) $< --compress $(UGLIFY_ELM_FLAGS) | $(UGLIFY) --mangle --output=$@
