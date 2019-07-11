@@ -31,6 +31,7 @@ body {
 a {
 	color: inherit;
 	transition: color var(--transition-default);
+	cursor: pointer;
 }
 
 a:hover {
@@ -175,12 +176,11 @@ thead {
 /* -------------------------------------------------------------------------- */
 
 .comments-wrapper {
-	border: 1px solid #d0d0d0;
 	position: fixed;
-	left: 1em;
-	top: 1em;
-	right: 1em;
-	bottom: 1em;
+	left: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
 	background: white;
 }
 
@@ -196,8 +196,40 @@ thead {
 }
 
 .comments-close {
+	width: 2em;
+	height: 2em;
 	position: absolute;
 	right: 1em;
 	top: 1em;
 	cursor: pointer;
+	background: url(close.svg) center no-repeat / 100%;
+	appearance: none;
+	-webkit-appearance: none;
+	border: none;
+	border-radius: 0;
+	margin: 0;
+	padding: 0.5em;
+	color: transparent;
+}
+
+.comments-wrapper ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.comments-wrapper li li {
+	border-top: 1px solid #e0e0e0;
+	margin-top: 0.5em;
+	padding-top: 0.5em;
+}
+
+.comments-wrapper li + li {
+	margin-top: 0.5em;
+	padding-top: 0.5em;
+	border-top: 1px solid #e0e0e0;
+}
+
+.comments-wrapper ul ul {
+	padding-left: 1.25em;
 }

@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import Browser.Events as BE
 import Dict
 import HackerNews as HN
 import Html as H
@@ -38,6 +39,7 @@ type Msg
     | UpdatePage Int
     | ShowComments HN.ItemId
     | HideComments
+    | KeyDown Int
 
 
 
@@ -59,7 +61,7 @@ main =
         { init = init
         , update = update
         , view = view
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         }
 
 
@@ -74,6 +76,13 @@ init flags =
             }
     in
     ( model, Task.perform GotTimeZone Time.here )
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Sub.batch
+        [ BE.onKeyDown (Decode.map KeyDown E.keyCode)
+        ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -101,8 +110,18 @@ update msg model =
                 |> Tuple.mapFirst setShowComments
 
         HideComments ->
-            ({ model | showComments = False }, Cmd.none)
+            ( { model | showComments = False }, Cmd.none )
 
+        KeyDown keyCode ->
+            let
+                newModel =
+                    if keyCode == 27 then
+                        { model | showComments = False }
+
+                    else
+                        model
+            in
+            ( newModel, Cmd.none )
 
 
 -- VIEW
@@ -140,7 +159,7 @@ view model =
         pagesCount =
             HN.pagesCount model.hackernews
 
-        flatComments =
+        comment =
             HN.currentComments model.hackernews
                 |> MT.children
     in
@@ -156,7 +175,7 @@ view model =
             , Lazy.lazy2 viewPaging pagesCount model.hackernews.page
             , nodeIf "div" [ A.class "comments-wrapper" ]
                 [ H.div [ A.class "comments-content" ]
-                    [ Lazy.lazy viewComments flatComments
+                    [ Lazy.lazy viewComments comment
                     ]
                 , H.button [ A.class "comments-close", E.onClick HideComments ] [ H.text "Close" ]
                 ]
@@ -270,10 +289,19 @@ viewPost post =
                 text =
                     "<div>" ++ comment.text ++ "</div>"
 
+                header =
+                    let
+                        authorText =
+                            comment.by
+                    in
+                    H.span [ A.class "post-info" ]
+                        [ H.text authorText
+                        ]
+
                 markdown =
                     Markdown.toHtml (Just markdownOptions) text
             in
-            H.div [ A.class "comment" ] markdown
+            H.div [ A.class "comment" ] (header :: markdown)
 
         HN.ItemJob job ->
             let
