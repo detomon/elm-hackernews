@@ -85,13 +85,13 @@ update msg model =
             ( { model | timeZone = timeZone }, Cmd.map HackerNewsMsg HN.fetchTopStories )
 
         HackerNewsMsg submsg ->
-            HN.update submsg model.hackernews |> updateHackernews model
+            model.hackernews |> HN.update submsg |> updateHackernews model
 
         UpdatePage page ->
-            HN.setPage page model.hackernews |> updateHackernews model
+            model.hackernews |> HN.setPage page |> updateHackernews model
 
         ShowComments itemId ->
-            HN.fetchComments model.hackernews itemId |> updateHackernews model
+            model.hackernews |> HN.fetchComments itemId |> updateHackernews model
 
 
 
@@ -140,7 +140,8 @@ view model =
             , Lazy.lazy viewError model.hackernews.error
             , Lazy.lazy2 viewItems items itemStart
             , Lazy.lazy2 viewPaging pagesCount model.hackernews.page
-            , Lazy.lazy viewComments (HN.currentComments model.hackernews)
+            , H.div [ A.class "comments-wrapper" ]
+                [ Lazy.lazy viewComments (HN.currentComments model.hackernews) ]
             ]
         ]
     }
@@ -194,15 +195,15 @@ viewPaging count page =
 {-| Comments.
 -}
 viewComments : MT.Tree HN.Item -> H.Html Msg
-viewComments comments =
+viewComments (MT.Tree item children) =
     let
+        keyedTree (MT.Tree child _ as node) =
+            ( String.fromInt <| HN.itemId child, viewComments node )
+
         posts =
-            comments
-                |> MT.flatten
-                |> List.map keyedItem
+            keyedItem item :: List.map keyedTree children
     in
-    H.div [ A.class "comments-wrapper" ]
-        [ Keyed.node "ul" [ A.class "comments-list" ] posts ]
+    Keyed.node "ul" [ A.class "comments-list" ] posts
 
 
 {-| Post.
@@ -219,7 +220,7 @@ viewPost post =
     in
     case post of
         HN.ItemPlaceholder id ->
-            viewPostTitle "post--placeholder" " " [ H.text " " ] Nothing
+            viewPostTitle "post--placeholder" "\u{00A0}" [ H.text "\u{00A0}" ] Nothing
 
         HN.ItemStory story ->
             let

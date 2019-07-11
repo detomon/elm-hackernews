@@ -177,6 +177,12 @@ thead {
 .comments-wrapper {
 	padding: 1em;
 	border: 1px solid #d0d0d0;
+	position: fixed;
+	left: 1em;
+	top: 1em;
+	right: 1em;
+	bottom: 1em;
+	background: white;
 }
 
 .comments-wrapper a {

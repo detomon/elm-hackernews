@@ -1,9 +1,8 @@
 module HackerNews exposing
-    ( Model, Item(..), Story, Comment, Msg(..)
+    ( Model, Item(..), ItemId, Story, Comment, Msg(..)
     , empty, update, setPage, currentItems, currentComments, pagesCount
     , fetchTopStories, fetchItems, fetchComments
     , itemId, pageUrl
-    , ItemId
     )
 
 {-| Fetch Hackernews stories and comments.
@@ -155,12 +154,17 @@ empty : Int -> Model
 empty itemsPerPage =
     { allIitemIds = []
     , pagedItems = []
-    , comments = MT.Tree (ItemPlaceholder 0) []
+    , comments = emptyCommentsTree
     , itemsCache = Dict.empty
     , itemsPerPage = itemsPerPage
     , page = 0
     , error = Nothing
     }
+
+
+emptyCommentsTree : MT.Tree Item
+emptyCommentsTree =
+    MT.Tree (ItemPlaceholder 0) []
 
 
 {-| Create a paged list segment.
@@ -235,7 +239,7 @@ update msg model =
             case result of
                 Ok item ->
                     let
-                        removeDeletedComment comment =
+                        isNotDeleted comment =
                             case comment of
                                 ItemComment { deleted } ->
                                     not deleted
@@ -243,13 +247,34 @@ update msg model =
                                 _ ->
                                     True
 
+                        newItemKids =
+                            case item of
+                                ItemComment { kids } ->
+                                    kids
+
+                                _ ->
+                                    []
+
+                        addChildComments (MT.Tree child _) =
+                            let
+                                placeholder childId =
+                                    MT.Tree (ItemPlaceholder childId) []
+                            in
+                            if itemId child == id then
+                                MT.Tree child (List.map placeholder newItemKids)
+                                    |> Just
+
+                            else
+                                Nothing
+
                         newModel =
                             { model
                                 | pagedItems = replacePlaceholder List.map id item model.pagedItems
                                 , comments =
                                     replacePlaceholder MT.map id item model.comments
-                                        |> MT.filter removeDeletedComment
-                                        |> Maybe.withDefault (MT.Tree (ItemPlaceholder 0) [])
+                                        |> MT.filter isNotDeleted
+                                        |> Maybe.withDefault emptyCommentsTree
+                                        |> treeReplace addChildComments
                                 , itemsCache = Dict.insert id item model.itemsCache
                             }
 
@@ -299,24 +324,28 @@ currentComments { comments } =
     comments
 
 
+{-| Get kids IDs.
+-}
+itemKids : Item -> List ItemId
+itemKids item =
+    case item of
+        ItemStory { kids } ->
+            kids
+
+        ItemComment { kids } ->
+            kids
+
+        _ ->
+            []
+
+
 {-| Get kids IDs using model cache.
 -}
-itemKids : Model -> ItemId -> List ItemId
-itemKids { itemsCache } id =
-    case Dict.get id itemsCache of
-        Just item ->
-            case item of
-                ItemStory { kids } ->
-                    kids
-
-                ItemComment { kids } ->
-                    kids
-
-                _ ->
-                    []
-
-        Nothing ->
-            []
+itemKidsCached : Model -> ItemId -> List ItemId
+itemKidsCached { itemsCache } id =
+    Dict.get id itemsCache
+        |> Maybe.map itemKids
+        |> Maybe.withDefault []
 
 
 {-| Set page.
@@ -329,7 +358,7 @@ setPage page model =
                 |> paging model.itemsPerPage page
 
         ( pagedItems, cmd ) =
-            getItems model pagedItemsIds
+            getItems pagedItemsIds model
 
         newModel =
             { model
@@ -342,21 +371,6 @@ setPage page model =
 
 
 -- NETWORK
-
-
-{-| Fetch item with ID.
--}
-fetchItem : (Result Http.Error Item -> Msg) -> ItemId -> Cmd Msg
-fetchItem msg id =
-    let
-        decodeItem =
-            D.field "type" D.string
-                |> D.andThen decodeItemWithType
-    in
-    Http.get
-        { url = itemUrl id
-        , expect = Http.expectJson msg decodeItem
-        }
 
 
 {-| Decode item with type name.
@@ -419,9 +433,24 @@ fetchTopStories =
         }
 
 
+{-| Fetch item with ID.
+-}
+fetchItem : (Result Http.Error Item -> Msg) -> ItemId -> Cmd Msg
+fetchItem msg id =
+    let
+        decodeItem =
+            D.field "type" D.string
+                |> D.andThen decodeItemWithType
+    in
+    Http.get
+        { url = itemUrl id
+        , expect = Http.expectJson msg decodeItem
+        }
+
+
 {-| Fetch items with given IDs.
 -}
-fetchItems : List ItemId ->  Cmd Msg
+fetchItems : List ItemId -> Cmd Msg
 fetchItems =
     List.map (\id -> fetchItem (GotItem id) id)
         >> List.reverse
@@ -431,16 +460,12 @@ fetchItems =
 
 {-| Fetch cached items. Add placeholder if not found and add fetch command.
 -}
-getItems : Model -> List ItemId -> ( List Item, Cmd Msg )
-getItems model itemIds =
+getItems : List ItemId -> Model -> ( List Item, Cmd Msg )
+getItems itemIds model =
     let
         cachedOrPlaceholderItem id =
-            case Dict.get id model.itemsCache of
-                Just item ->
-                    item
-
-                Nothing ->
-                    ItemPlaceholder id
+            Dict.get id model.itemsCache
+                |> Maybe.withDefault (ItemPlaceholder id)
 
         isPlaceholder item =
             case item of
@@ -466,23 +491,29 @@ getItems model itemIds =
 
 {-| Fetch comments from (already loaded) parent item.
 -}
-fetchComments : Model -> ItemId -> ( Model, Cmd Msg )
-fetchComments model parentId =
+fetchComments : ItemId -> Model -> ( Model, Cmd Msg )
+fetchComments parentId model =
     let
-        item =
-            case Dict.get parentId model.itemsCache of
-                Just i ->
-                    i
-
-                Nothing ->
-                    ItemPlaceholder 0
+        parent =
+            Dict.get parentId model.itemsCache
+                |> Maybe.withDefault (ItemPlaceholder 0)
 
         ( comments, cmd ) =
-            getItems model (itemKids model parentId)
+            getItems (itemKidsCached model parentId) model
 
         newModel =
-            { model
-                | comments = MT.Tree item (List.map (\i -> MT.Tree i []) comments)
-            }
+            { model | comments = MT.Tree parent (List.map (\i -> MT.Tree i []) comments) }
     in
     ( newModel, cmd )
+
+
+
+-- TREE
+
+
+{-| Map every tree node to a new node.
+-}
+treeReplace : (MT.Tree a -> Maybe (MT.Tree a)) -> MT.Tree a -> MT.Tree a
+treeReplace fn (MT.Tree datum children as tree) =
+    fn tree
+        |> Maybe.withDefault (MT.Tree datum (List.map (treeReplace fn) children))
