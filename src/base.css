@@ -175,7 +175,6 @@ thead {
 /* -------------------------------------------------------------------------- */
 
 .comments-wrapper {
-	padding: 1em;
 	border: 1px solid #d0d0d0;
 	position: fixed;
 	left: 1em;
@@ -185,6 +184,20 @@ thead {
 	background: white;
 }
 
+.comments-content {
+	padding: 1em;
+	max-height: 100%;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
 .comments-wrapper a {
 	text-decoration: underline;
+}
+
+.comments-close {
+	position: absolute;
+	right: 1em;
+	top: 1em;
+	cursor: pointer;
 }

@@ -22,6 +22,7 @@ type alias Model =
     { title : String
     , timeZone : Time.Zone
     , hackernews : HN.Model
+    , showComments : Bool
     }
 
 
@@ -36,6 +37,7 @@ type Msg
     | HackerNewsMsg HN.Msg
     | UpdatePage Int
     | ShowComments HN.ItemId
+    | HideComments
 
 
 
@@ -68,6 +70,7 @@ init flags =
             { title = "Hacker News"
             , timeZone = Time.utc
             , hackernews = HN.empty itemsPerPage
+            , showComments = False
             }
     in
     ( model, Task.perform GotTimeZone Time.here )
@@ -78,6 +81,9 @@ update msg model =
     let
         updateHackernews newModel ( hackernews, cmd ) =
             ( { newModel | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
+
+        setShowComments m =
+            { m | showComments = True }
     in
     case msg of
         -- fetch top stories after retrieving time zone
@@ -92,6 +98,10 @@ update msg model =
 
         ShowComments itemId ->
             model.hackernews |> HN.fetchComments itemId |> updateHackernews model
+                |> Tuple.mapFirst setShowComments
+
+        HideComments ->
+            ({ model | showComments = False }, Cmd.none)
 
 
 
@@ -129,6 +139,10 @@ view model =
 
         pagesCount =
             HN.pagesCount model.hackernews
+
+        flatComments =
+            HN.currentComments model.hackernews
+                |> MT.children
     in
     { title = model.title
     , body =
@@ -140,8 +154,13 @@ view model =
             , Lazy.lazy viewError model.hackernews.error
             , Lazy.lazy2 viewItems items itemStart
             , Lazy.lazy2 viewPaging pagesCount model.hackernews.page
-            , H.div [ A.class "comments-wrapper" ]
-                [ Lazy.lazy viewComments (HN.currentComments model.hackernews) ]
+            , nodeIf "div" [ A.class "comments-wrapper" ]
+                [ H.div [ A.class "comments-content" ]
+                    [ Lazy.lazy viewComments flatComments
+                    ]
+                , H.button [ A.class "comments-close", E.onClick HideComments ] [ H.text "Close" ]
+                ]
+                model.showComments
             ]
         ]
     }
@@ -194,14 +213,20 @@ viewPaging count page =
 
 {-| Comments.
 -}
-viewComments : MT.Tree HN.Item -> H.Html Msg
-viewComments (MT.Tree item children) =
+viewComments : List (MT.Tree HN.Item) -> H.Html Msg
+viewComments children =
     let
-        keyedTree (MT.Tree child _ as node) =
-            ( String.fromInt <| HN.itemId child, viewComments node )
+        post i n =
+            H.li []
+                [ viewPost i
+                , viewComments n
+                ]
+
+        keyedTree (MT.Tree child subchildren ) =
+            ( String.fromInt <| HN.itemId child, post child subchildren )
 
         posts =
-            keyedItem item :: List.map keyedTree children
+            List.map keyedTree children
     in
     Keyed.node "ul" [ A.class "comments-list" ] posts
 
@@ -248,7 +273,7 @@ viewPost post =
                 markdown =
                     Markdown.toHtml (Just markdownOptions) text
             in
-            H.li [] markdown
+            H.div [ A.class "comment" ] markdown
 
         HN.ItemJob job ->
             let
