@@ -106,7 +106,9 @@ update msg model =
             model.hackernews |> HN.setPage page |> updateHackernews model
 
         ShowComments itemId ->
-            model.hackernews |> HN.fetchComments itemId |> updateHackernews model
+            model.hackernews
+                |> HN.fetchChildren itemId
+                |> updateHackernews model
                 |> Tuple.mapFirst setShowComments
 
         HideComments ->
@@ -122,6 +124,7 @@ update msg model =
                         model
             in
             ( newModel, Cmd.none )
+
 
 
 -- VIEW
@@ -173,7 +176,8 @@ view model =
             , Lazy.lazy viewError model.hackernews.error
             , Lazy.lazy2 viewItems items itemStart
             , Lazy.lazy2 viewPaging pagesCount model.hackernews.page
-            , nodeIf "div" [ A.class "comments-wrapper" ]
+            , nodeIf "div"
+                [ A.class "comments-wrapper" ]
                 [ H.div [ A.class "comments-content" ]
                     [ Lazy.lazy viewComments comment
                     ]
@@ -241,7 +245,7 @@ viewComments children =
                 , viewComments n
                 ]
 
-        keyedTree (MT.Tree child subchildren ) =
+        keyedTree (MT.Tree child subchildren) =
             ( String.fromInt <| HN.itemId child, post child subchildren )
 
         posts =

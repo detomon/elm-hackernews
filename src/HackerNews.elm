@@ -1,7 +1,7 @@
 module HackerNews exposing
     ( Model, Item(..), ItemId, Story, Comment, Msg(..)
     , empty, update, setPage, currentItems, currentComments, pagesCount
-    , fetchTopStories, fetchItems, fetchComments
+    , fetchTopStories, fetchItems, fetchChildren
     , itemId, pageUrl
     )
 
@@ -17,7 +17,7 @@ module HackerNews exposing
 
 # Network
 
-@docs fetchTopStories, fetchItems, fetchComments
+@docs fetchTopStories, fetchItems, fetchChildren
 
 
 # Helpers
@@ -103,7 +103,7 @@ type alias Job =
     }
 
 
-{-| Allowed item types.
+{-| Known item types.
 -}
 type Item
     = ItemPlaceholder ItemId
@@ -125,8 +125,8 @@ pageUrl =
 
 {-| The base API URL.
 -}
-baseUrl : String
-baseUrl =
+apiUrl : String
+apiUrl =
     "https://hacker-news.firebaseio.com/v0"
 
 
@@ -134,14 +134,14 @@ baseUrl =
 -}
 topStoriesUrl : String
 topStoriesUrl =
-    baseUrl ++ "/topstories.json"
+    apiUrl ++ "/topstories.json"
 
 
 {-| Make item URL with ID.
 -}
 itemUrl : ItemId -> String
 itemUrl id =
-    baseUrl ++ "/item/" ++ String.fromInt id ++ ".json"
+    apiUrl ++ "/item/" ++ String.fromInt id ++ ".json"
 
 
 
@@ -154,7 +154,7 @@ empty : Int -> Model
 empty itemsPerPage =
     { allIitemIds = []
     , pagedItems = []
-    , comments = emptyCommentsTree
+    , comments = emptyComments
     , itemsCache = Dict.empty
     , itemsPerPage = itemsPerPage
     , page = 0
@@ -162,8 +162,8 @@ empty itemsPerPage =
     }
 
 
-emptyCommentsTree : MT.Tree Item
-emptyCommentsTree =
+emptyComments : MT.Tree Item
+emptyComments =
     MT.Tree (ItemPlaceholder 0) []
 
 
@@ -255,7 +255,7 @@ update msg model =
                                 _ ->
                                     []
 
-                        addChildComments (MT.Tree child _) =
+                        addChildren (MT.Tree child _) =
                             let
                                 placeholder childId =
                                     MT.Tree (ItemPlaceholder childId) []
@@ -273,20 +273,15 @@ update msg model =
                                 , comments =
                                     replacePlaceholder MT.map id item model.comments
                                         |> MT.filter isNotDeleted
-                                        |> Maybe.withDefault emptyCommentsTree
-                                        |> treeReplace addChildComments
+                                        |> Maybe.withDefault emptyComments
+                                        |> treeReplace addChildren
                                 , itemsCache = Dict.insert id item model.itemsCache
                             }
 
-                        loadChildComments =
-                            case item of
-                                ItemComment { kids } ->
-                                    fetchItems kids
-
-                                _ ->
-                                    Cmd.none
+                        loadChildren =
+                            fetchItems (itemKids item)
                     in
-                    ( newModel, loadChildComments )
+                    ( newModel, loadChildren )
 
                 Err err ->
                     setError err
@@ -489,22 +484,38 @@ getItems itemIds model =
     ( itemList, cmd )
 
 
-{-| Fetch comments from (already loaded) parent item.
+{-| Fetch children recursive from item.
 -}
-fetchComments : ItemId -> Model -> ( Model, Cmd Msg )
-fetchComments parentId model =
+fetchChildren : ItemId -> Model -> ( Model, Cmd Msg )
+fetchChildren parentId model =
     let
         parent =
             Dict.get parentId model.itemsCache
                 |> Maybe.withDefault (ItemPlaceholder 0)
 
-        ( comments, cmd ) =
-            getItems (itemKidsCached model parentId) model
+        fetchChild child =
+            let
+                ( children, subCmd ) =
+                    getItems (itemKids child) model
 
-        newModel =
-            { model | comments = MT.Tree parent (List.map (\i -> MT.Tree i []) comments) }
+                list =
+                    List.map fetchChild children
+
+                treeChildren =
+                    List.map Tuple.first list
+
+                childCmds =
+                    List.map Tuple.second list
+
+                cmds =
+                    subCmd :: childCmds
+            in
+            ( MT.Tree child treeChildren, Cmd.batch cmds )
+
+        ( comments, cmdList ) =
+            fetchChild parent
     in
-    ( newModel, cmd )
+    ( { model | comments = comments }, cmdList )
 
 
 
@@ -514,6 +525,6 @@ fetchComments parentId model =
 {-| Map every tree node to a new node.
 -}
 treeReplace : (MT.Tree a -> Maybe (MT.Tree a)) -> MT.Tree a -> MT.Tree a
-treeReplace fn (MT.Tree datum children as tree) =
+treeReplace fn ((MT.Tree datum children) as tree) =
     fn tree
         |> Maybe.withDefault (MT.Tree datum (List.map (treeReplace fn) children))
