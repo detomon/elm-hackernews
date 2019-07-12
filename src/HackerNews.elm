@@ -363,16 +363,19 @@ itemKidsCached { itemsCache } id =
 setPage : Int -> Model -> ( Model, Cmd Msg )
 setPage page model =
     let
+        newPage =
+            max 0 page
+
         pagedItemsIds =
             model.allIitemIds
-                |> paging model.itemsPerPage page
+                |> paging model.itemsPerPage newPage
 
         ( pagedItems, cmd ) =
             getItems pagedItemsIds model
 
         newModel =
             { model
-                | page = page
+                | page = newPage
                 , pagedItems = pagedItems
             }
     in

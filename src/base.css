@@ -169,9 +169,11 @@ thead {
 }
 
 .paging__page a {
-	cursor: pointer;
+	color: inherit;
 	padding: 0 0.5em;
+	text-decoration: none;
 }
+
 
 /* -------------------------------------------------------------------------- */
 

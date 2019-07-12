@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Browser
 import Browser.Events as BE
+import Browser.Navigation as Nav
 import Dict
 import HackerNews as HN
 import Html as H
@@ -17,10 +18,14 @@ import Markdown.Config as MarkdownConfig
 import MultiwayTree as MT
 import Task
 import Time
+import Url
+import Url.Parser as UP exposing (Parser, (</>))
 
 
 type alias Model =
-    { title : String
+    { key : Nav.Key
+    , url : Url.Url
+    , title : String
     , timeZone : Time.Zone
     , hackernews : HN.Model
     , showComments : Bool
@@ -34,12 +39,17 @@ type Item
 
 
 type Msg
-    = GotTimeZone Time.Zone
+    = UrlRequest Browser.UrlRequest
+    | UrlChange Url.Url
+    | GotTimeZone Time.Zone
     | HackerNewsMsg HN.Msg
     | UpdatePage Int
     | ShowComments HN.ItemId
     | HideComments
     | KeyDown Int
+
+type Route
+    = PageRoute Int
 
 
 
@@ -52,30 +62,58 @@ itemsPerPage =
 
 
 
+-- ROUTES
+
+
+routes : Parser (Route -> a) a
+routes =
+  UP.oneOf
+    [ UP.map PageRoute (UP.s "page" </> UP.int)
+    ]
+
+
+
 -- MAIN
 
 
 main : Program () Model Msg
 main =
-    Browser.document
+    Browser.application
         { init = init
         , update = update
         , view = view
         , subscriptions = subscriptions
+        , onUrlRequest = onUrlRequest
+        , onUrlChange = onUrlChange
         }
 
 
-init : () -> ( Model, Cmd Msg )
-init flags =
+onUrlRequest : Browser.UrlRequest -> Msg
+onUrlRequest request =
+    UrlRequest request
+
+
+onUrlChange : Url.Url -> Msg
+onUrlChange url =
+    UrlChange url
+
+
+init : () ->  Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
     let
         model =
-            { title = "Hacker News"
+            { key = key
+            , url = url
+            , title = "Hacker News"
             , timeZone = Time.utc
             , hackernews = HN.empty itemsPerPage
             , showComments = False
             }
+
+        ( newModel, cmd ) =
+            handleUrl url model
     in
-    ( model, Task.perform GotTimeZone Time.here )
+    ( newModel, Cmd.batch [ cmd, Task.perform GotTimeZone Time.here ] )
 
 
 subscriptions : Model -> Sub Msg
@@ -85,12 +123,34 @@ subscriptions _ =
         ]
 
 
+updateHackernews : Model -> ( HN.Model, Cmd HN.Msg ) -> ( Model, Cmd Msg )
+updateHackernews newModel ( hackernews, cmd ) =
+    ( { newModel | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
+
+
+handleUrl : Url.Url -> Model -> ( Model, Cmd Msg )
+handleUrl url model =
+    let
+        maybeRoute =
+            UP.parse routes url
+
+        ( newModel, cmd ) =
+            case maybeRoute of
+                Just route ->
+                    case route of
+                        PageRoute page ->
+                            -- todo: check page range
+                            model.hackernews |> HN.setPage (page - 1) |> updateHackernews model
+
+                Nothing ->
+                    ( model, Cmd.none )
+    in
+    ( { newModel | url = url }, cmd )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        updateHackernews newModel ( hackernews, cmd ) =
-            ( { newModel | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
-
         setShowComments m =
             { m | showComments = True }
     in
@@ -125,6 +185,16 @@ update msg model =
             in
             ( newModel, Cmd.none )
 
+        UrlRequest request ->
+            case request of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
+
+                Browser.External href ->
+                    ( model, Nav.load href )
+
+        UrlChange url ->
+            handleUrl url model
 
 
 -- VIEW
@@ -220,12 +290,16 @@ viewPaging : Int -> Int -> H.Html Msg
 viewPaging count page =
     let
         listItem n =
+            let
+                href =
+                    "/page/" ++ String.fromInt (n + 1)
+            in
             H.li
                 [ A.class "paging__page"
                 , A.classList [ ( "paging--active", page == n ) ]
-                , E.onClick (UpdatePage n)
+                --, E.onClick (UpdatePage n)
                 ]
-                [ H.a [] [ H.text (String.fromInt (n + 1)) ]
+                [ H.a [ A.href href ] [ H.text (String.fromInt (n + 1)) ]
                 ]
 
         pages =
@@ -289,7 +363,7 @@ viewPost post =
 
                 info =
                     [ H.text text
-                    , H.a [ E.onClick (ShowComments story.id) ] [ H.text comments ]
+                    , H.a [ A.href "#comments", E.onClick (ShowComments story.id) ] [ H.text comments ]
                     ]
             in
             viewPostTitle
