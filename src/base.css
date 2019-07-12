@@ -212,24 +212,21 @@ thead {
 	color: transparent;
 }
 
-.comments-wrapper ul {
+.comments-list {
 	margin: 0;
 	padding: 0;
 	list-style: none;
 }
 
-.comments-wrapper li li {
-	border-top: 1px solid #e0e0e0;
-	margin-top: 0.5em;
-	padding-top: 0.5em;
+.comments-list > li + li {
+	border-top: 1px solid #c0c0c0;
+	margin-top: 0.66em;
+	padding-top: 0.66em;
 }
 
-.comments-wrapper li + li {
-	margin-top: 0.5em;
-	padding-top: 0.5em;
-	border-top: 1px solid #e0e0e0;
-}
-
-.comments-wrapper ul ul {
-	padding-left: 1.25em;
+.comments-list .comments-list {
+	margin: 0.66em 0 0 0.66em;
+	padding: 0.66em 0 0.5em 0.66em;
+	border: solid #c0c0c0;
+	border-width: 1px 0 0 1px;
 }

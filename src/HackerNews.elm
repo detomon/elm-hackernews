@@ -215,19 +215,22 @@ resultErrorString error =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
+        placeholderId item =
+            case item of
+                ItemPlaceholder id ->
+                    Just id
+
+                _ ->
+                    Nothing
+
         replacePlaceholder map id newItem =
             map
                 (\item ->
-                    case item of
-                        ItemPlaceholder placeholderId ->
-                            if placeholderId == id then
-                                newItem
+                    if placeholderId item == Just id then
+                        newItem
 
-                            else
-                                item
-
-                        _ ->
-                            item
+                    else
+                        item
                 )
 
         setError err =
@@ -527,14 +530,10 @@ fetchChildren parentId model =
                 ( children, subCmd ) =
                     getItems (itemKids child) model
 
-                list =
-                    List.map fetchChild children
-
-                treeChildren =
-                    List.map Tuple.first list
-
-                childCmds =
-                    List.map Tuple.second list
+                ( treeChildren, childCmds ) =
+                    children
+                        |> List.map fetchChild
+                        |> List.unzip
 
                 cmds =
                     subCmd :: childCmds

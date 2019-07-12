@@ -242,7 +242,11 @@ viewComments children =
         post i n =
             H.li []
                 [ viewPost i
-                , viewComments n
+                , if List.length n > 0 then
+                    viewComments n
+
+                else
+                    H.text ""
                 ]
 
         keyedTree (MT.Tree child subchildren) =
@@ -304,12 +308,8 @@ viewPost post =
                     "<div>" ++ comment.text ++ "</div>"
 
                 header =
-                    let
-                        authorText =
-                            comment.by
-                    in
                     H.span [ A.class "post-info" ]
-                        [ H.text authorText
+                        [ H.text comment.by
                         ]
 
                 markdown =
