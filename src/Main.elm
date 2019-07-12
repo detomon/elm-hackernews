@@ -268,7 +268,12 @@ viewPost post =
     in
     case post of
         HN.ItemPlaceholder id ->
-            viewPostTitle "post--placeholder" "\u{00A0}" [ H.text "\u{00A0}" ] Nothing
+            viewPostTitle
+                { class = "post--placeholder"
+                , title = "\u{00A0}"
+                , info = [ H.text "\u{00A0}" ]
+                , href = Nothing
+                }
 
         HN.ItemStory story ->
             let
@@ -283,7 +288,12 @@ viewPost post =
                     , H.a [ E.onClick (ShowComments story.id) ] [ H.text comments ]
                     ]
             in
-            viewPostTitle "" story.title info story.url
+            viewPostTitle
+                { class = ""
+                , title = story.title
+                , info = info
+                , href = story.url
+                }
 
         HN.ItemComment comment ->
             let
@@ -312,21 +322,35 @@ viewPost post =
                 infoText =
                     String.fromInt job.score ++ " points by " ++ job.by
             in
-            viewPostTitle "" job.title [ H.text infoText ] job.url
+            viewPostTitle
+                { class = ""
+                , title = job.title
+                , info = [ H.text infoText ]
+                , href = job.url
+                }
 
 
 {-| Post title.
 -}
-viewPostTitle : String -> String -> List (H.Html Msg) -> Maybe String -> H.Html Msg
-viewPostTitle class title info href =
+viewPostTitle :
+    { class : String
+    , title : String
+    , info : List (H.Html Msg)
+    , href : Maybe String
+    }
+    -> H.Html Msg
+viewPostTitle { class, title, info, href } =
     let
-        titleNode =
-            case href of
-                Nothing ->
-                    H.text title
+        textNode =
+            H.text title
 
-                Just url ->
-                    H.a [ A.href url, A.rel "noreferrer" ] [ H.text title ]
+        link url =
+            H.a [ A.href url, A.rel "noreferrer" ] [ textNode ]
+
+        titleNode =
+            href
+                |> Maybe.map link
+                |> Maybe.withDefault textNode
     in
     H.li [ A.class "post", A.class class ]
         [ H.span [ A.class "post-title" ] [ titleNode ]
