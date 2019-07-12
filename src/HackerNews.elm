@@ -279,7 +279,12 @@ update msg model =
                             }
 
                         loadChildren =
-                            fetchItems (itemKids item)
+                            case item of
+                                ItemComment _ ->
+                                    fetchItems (itemKids item)
+
+                                _ ->
+                                    Cmd.none
                     in
                     ( newModel, loadChildren )
 
