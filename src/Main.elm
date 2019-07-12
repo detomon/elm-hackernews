@@ -238,7 +238,7 @@ view model =
     in
     { title = model.title
     , body =
-        [ H.node "link" [ A.rel "stylesheet", A.href "base.css" ] []
+        [ H.node "link" [ A.rel "stylesheet", A.href "/assets/base.css" ] []
         , H.div [ A.class "page-wrapper" ]
             [ H.h1 [ A.class "page-title" ]
                 [ H.a [ A.href HN.pageUrl, A.rel "noreferrer" ] [ H.text model.title ]
