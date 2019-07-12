@@ -144,6 +144,13 @@ itemUrl id =
     apiUrl ++ "/item/" ++ String.fromInt id ++ ".json"
 
 
+{-| Http request timeout.
+-}
+httpTimeout : Float
+httpTimeout =
+    60 * 1000
+
+
 
 -- MAIN
 
@@ -373,6 +380,23 @@ setPage page model =
 -- NETWORK
 
 
+httpGet :
+    { url : String
+    , expect : Http.Expect msg
+    }
+    -> Cmd msg
+httpGet r =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url = r.url
+        , body = Http.emptyBody
+        , expect = r.expect
+        , timeout = Just httpTimeout
+        , tracker = Nothing
+        }
+
+
 {-| Decode item with type name.
 -}
 decodeItemWithType : String -> D.Decoder Item
@@ -427,7 +451,7 @@ fetchTopStories =
         decodeItemIds =
             D.list D.int
     in
-    Http.get
+    httpGet
         { url = topStoriesUrl
         , expect = Http.expectJson GotTopStories decodeItemIds
         }
@@ -442,7 +466,7 @@ fetchItem msg id =
             D.field "type" D.string
                 |> D.andThen decodeItemWithType
     in
-    Http.get
+    httpGet
         { url = itemUrl id
         , expect = Http.expectJson msg decodeItem
         }
