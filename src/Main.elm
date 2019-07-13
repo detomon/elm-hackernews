@@ -14,7 +14,7 @@ import Http
 import Json.Decode as Decode
 import List.Extra as ListExtra
 import Markdown
-import Markdown.Config as MarkdownConfig
+import Markdown.Config as MC
 import MultiwayTree as MT
 import Task
 import Time
@@ -323,24 +323,32 @@ viewComments children =
     Keyed.node "ul" [ A.class "comments-list" ] posts
 
 
+markdownOptions : Maybe MC.Options
+markdownOptions =
+    let
+        options =
+            MC.defaultOptions
+    in
+    Just { options | rawHtml = MC.ParseUnsafe }
+
+
+{-| The non-breaking space.
+-}
+nobreakSpace : String
+nobreakSpace =
+    "\u{00A0}"
+
+
 {-| Post.
 -}
 viewPost : HN.Item -> H.Html Msg
 viewPost post =
-    let
-        markdownOptions =
-            let
-                options =
-                    MarkdownConfig.defaultOptions
-            in
-            { options | rawHtml = MarkdownConfig.ParseUnsafe }
-    in
     case post of
         HN.ItemPlaceholder id ->
             viewPostTitle
                 { class = "post--placeholder"
-                , title = "\u{00A0}"
-                , info = [ H.text "\u{00A0}" ]
+                , title = nobreakSpace
+                , info = [ H.text nobreakSpace ]
                 , href = Nothing
                 }
 
@@ -378,7 +386,7 @@ viewPost post =
                         ]
 
                 markdown =
-                    Markdown.toHtml (Just markdownOptions) text
+                    Markdown.toHtml markdownOptions text
             in
             H.div [ A.class "comment" ] (header :: markdown)
 
