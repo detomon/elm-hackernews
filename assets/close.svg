@@ -1,10 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="200px" height="200px" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <!-- Generator: Sketch 55.2 (78181) - https://sketchapp.com -->
-    <title>Artboard</title>
-    <desc>Created with Sketch.</desc>
-    <g id="Artboard" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <rect id="Rectangle" fill="#202020" transform="translate(100.000000, 100.000000) rotate(-315.000000) translate(-100.000000, -100.000000) " x="0" y="90" width="200" height="20"></rect>
-        <rect id="Rectangle-Copy" fill="#202020" transform="translate(100.000000, 100.000000) rotate(-45.000000) translate(-100.000000, -100.000000) " x="0" y="90" width="200" height="20"></rect>
-    </g>
-</svg>
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><g fill="#202020" fill-rule="evenodd"><path d="M36.36 22.218L177.782 163.64l-14.142 14.142L22.218 36.36z"/><path d="M22.218 163.64L163.64 22.218l14.142 14.142L36.36 177.782z"/></g></svg>

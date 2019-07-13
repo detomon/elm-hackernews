@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Browser
-import Browser.Events as BE
+import Browser.Events as Events
 import Browser.Navigation as Nav
 import Dict
 import HackerNews as HN
@@ -19,7 +19,7 @@ import MultiwayTree as MT
 import Task
 import Time
 import Url
-import Url.Parser as UP exposing (Parser, (</>))
+import Url.Parser as UP exposing ((</>), Parser)
 
 
 type alias Model =
@@ -48,6 +48,7 @@ type Msg
     | HideComments
     | KeyDown Int
 
+
 type Route
     = PageRoute Int
 
@@ -67,9 +68,9 @@ itemsPerPage =
 
 routes : Parser (Route -> a) a
 routes =
-  UP.oneOf
-    [ UP.map PageRoute (UP.s "page" </> UP.int)
-    ]
+    UP.oneOf
+        [ UP.map PageRoute (UP.s "page" </> UP.int)
+        ]
 
 
 
@@ -83,22 +84,12 @@ main =
         , update = update
         , view = view
         , subscriptions = subscriptions
-        , onUrlRequest = onUrlRequest
-        , onUrlChange = onUrlChange
+        , onUrlRequest = UrlRequest
+        , onUrlChange = UrlChange
         }
 
 
-onUrlRequest : Browser.UrlRequest -> Msg
-onUrlRequest request =
-    UrlRequest request
-
-
-onUrlChange : Url.Url -> Msg
-onUrlChange url =
-    UrlChange url
-
-
-init : () ->  Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
         model =
@@ -119,7 +110,7 @@ init flags url key =
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
-        [ BE.onKeyDown (Decode.map KeyDown E.keyCode)
+        [ Events.onKeyDown (Decode.map KeyDown E.keyCode)
         ]
 
 
@@ -128,22 +119,20 @@ updateHackernews newModel ( hackernews, cmd ) =
     ( { newModel | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
 
 
+handleRoute : Model -> Route -> ( Model, Cmd Msg )
+handleRoute model route =
+    case route of
+        PageRoute page ->
+            -- todo: check page range
+            model.hackernews |> HN.setPage (page - 1) |> updateHackernews model
+
+
 handleUrl : Url.Url -> Model -> ( Model, Cmd Msg )
 handleUrl url model =
     let
-        maybeRoute =
-            UP.parse routes url
-
         ( newModel, cmd ) =
-            case maybeRoute of
-                Just route ->
-                    case route of
-                        PageRoute page ->
-                            -- todo: check page range
-                            model.hackernews |> HN.setPage (page - 1) |> updateHackernews model
-
-                Nothing ->
-                    ( model, Cmd.none )
+            Maybe.map (handleRoute model) (UP.parse routes url)
+                |> Maybe.withDefault ( model, Cmd.none )
     in
     ( { newModel | url = url }, cmd )
 
@@ -195,6 +184,7 @@ update msg model =
 
         UrlChange url ->
             handleUrl url model
+
 
 
 -- VIEW
@@ -297,6 +287,7 @@ viewPaging count page =
             H.li
                 [ A.class "paging__page"
                 , A.classList [ ( "paging--active", page == n ) ]
+
                 --, E.onClick (UpdatePage n)
                 ]
                 [ H.a [ A.href href ] [ H.text (String.fromInt (n + 1)) ]
@@ -319,7 +310,7 @@ viewComments children =
                 , if List.length n > 0 then
                     viewComments n
 
-                else
+                  else
                     H.text ""
                 ]
 
