@@ -50,7 +50,8 @@ type Msg
 
 
 type Route
-    = PageRoute Int
+    = PageHome
+    | PageRoute Int
 
 
 
@@ -69,8 +70,14 @@ itemsPerPage =
 routes : Parser (Route -> a) a
 routes =
     UP.oneOf
-        [ UP.map PageRoute (UP.s "page" </> UP.int)
+        [  UP.map PageHome (UP.top)
+        ,  UP.map PageRoute (UP.s "page" </> UP.int)
         ]
+
+
+pageUrl : Int -> String
+pageUrl page =
+    "/page/" ++ String.fromInt (page + 1)
 
 
 
@@ -104,7 +111,7 @@ init flags url key =
         ( newModel, cmd ) =
             handleUrl url model
     in
-    ( newModel, Cmd.batch [ cmd, Task.perform GotTimeZone Time.here ] )
+    ( newModel, Cmd.batch [ Task.perform GotTimeZone Time.here, cmd ] )
 
 
 subscriptions : Model -> Sub Msg
@@ -119,19 +126,20 @@ updateHackernews newModel ( hackernews, cmd ) =
     ( { newModel | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
 
 
-handleRoute : Model -> Route -> ( Model, Cmd Msg )
-handleRoute model route =
-    case route of
-        PageRoute page ->
-            -- todo: check page range
-            model.hackernews |> HN.setPage (page - 1) |> updateHackernews model
-
-
 handleUrl : Url.Url -> Model -> ( Model, Cmd Msg )
 handleUrl url model =
     let
+        handleRoute route =
+            case route of
+                PageHome ->
+                    model.hackernews |> HN.setPage 0 |> updateHackernews model
+
+                PageRoute page ->
+                    -- todo: check page range
+                    model.hackernews |> HN.setPage (page - 1) |> updateHackernews model
+
         ( newModel, cmd ) =
-            Maybe.map (handleRoute model) (UP.parse routes url)
+            Maybe.map handleRoute (UP.parse routes url)
                 |> Maybe.withDefault ( model, Cmd.none )
     in
     ( { newModel | url = url }, cmd )
@@ -280,17 +288,11 @@ viewPaging : Int -> Int -> H.Html Msg
 viewPaging count page =
     let
         listItem n =
-            let
-                href =
-                    "/page/" ++ String.fromInt (n + 1)
-            in
             H.li
                 [ A.class "paging__page"
                 , A.classList [ ( "paging--active", page == n ) ]
-
-                --, E.onClick (UpdatePage n)
                 ]
-                [ H.a [ A.href href ] [ H.text (String.fromInt (n + 1)) ]
+                [ H.a [ A.href (pageUrl n) ] [ H.text (String.fromInt (n + 1)) ]
                 ]
 
         pages =
