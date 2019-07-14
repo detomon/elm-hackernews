@@ -288,13 +288,13 @@ update msg model =
                                 , itemsCache = Dict.insert id item model.itemsCache
                             }
 
-                        loadChildren =
+                        ( _, loadChildren ) =
                             case item of
                                 ItemComment _ ->
-                                    fetchItems (itemKids item)
+                                    fetchItems (itemKids item) newModel
 
                                 _ ->
-                                    Cmd.none
+                                    ( [], Cmd.none )
                     in
                     ( newModel, loadChildren )
 
@@ -349,15 +349,6 @@ itemKids item =
             []
 
 
-{-| Get kids IDs using model cache.
--}
-itemKidsCached : Model -> ItemId -> List ItemId
-itemKidsCached { itemsCache } id =
-    Dict.get id itemsCache
-        |> Maybe.map itemKids
-        |> Maybe.withDefault []
-
-
 {-| Set page.
 -}
 setPage : Int -> Model -> ( Model, Cmd Msg )
@@ -371,7 +362,7 @@ setPage page model =
                 |> paging model.itemsPerPage newPage
 
         ( pagedItems, cmd ) =
-            getItems pagedItemsIds model
+            fetchItems pagedItemsIds model
 
         newModel =
             { model
@@ -463,36 +454,27 @@ fetchTopStories =
         }
 
 
-{-| Fetch item with ID.
+{-| Fetch cached items or fetch new items. Add placeholder if not found and add fetch command.
 -}
-fetchItem : (Result Http.Error Item -> Msg) -> ItemId -> Cmd Msg
-fetchItem msg id =
+fetchItems : List ItemId -> Model -> ( List Item, Cmd Msg )
+fetchItems itemIds model =
     let
         decodeItem =
             D.field "type" D.string
                 |> D.andThen decodeItemWithType
-    in
-    httpGet
-        { url = itemUrl id
-        , expect = Http.expectJson msg decodeItem
-        }
 
+        fetchItem msg id =
+            httpGet
+                { url = itemUrl id
+                , expect = Http.expectJson msg decodeItem
+                }
 
-{-| Fetch items with given IDs.
--}
-fetchItems : List ItemId -> Cmd Msg
-fetchItems =
-    List.map (\id -> fetchItem (GotItem id) id)
-        >> List.reverse
-        -- reverse; commands seem to be started backwards
-        >> Cmd.batch
+        fetchList =
+            List.map (\id -> fetchItem (GotItem id) id)
+                >> List.reverse
+                -- reverse; commands seem to be started backwards
+                >> Cmd.batch
 
-
-{-| Fetch cached items. Add placeholder if not found and add fetch command.
--}
-getItems : List ItemId -> Model -> ( List Item, Cmd Msg )
-getItems itemIds model =
-    let
         cachedOrPlaceholderItem id =
             Dict.get id model.itemsCache
                 |> Maybe.withDefault (ItemPlaceholder id)
@@ -514,7 +496,7 @@ getItems itemIds model =
                 |> List.map itemId
 
         cmd =
-            fetchItems missingItemIds
+            fetchList missingItemIds
     in
     ( itemList, cmd )
 
@@ -531,7 +513,7 @@ fetchChildren parentId model =
         fetchChild child =
             let
                 ( children, subCmd ) =
-                    getItems (itemKids child) model
+                    fetchItems (itemKids child) model
 
                 ( treeChildren, childCmds ) =
                     children
