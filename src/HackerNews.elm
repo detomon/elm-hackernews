@@ -31,8 +31,8 @@ import Http
 import Json.Decode as D
 import Json.Decode.Pipeline as JP
 import MultiwayTree as MT
+import MultiwayTree.Extra as MTE
 import Time
-
 
 
 -- TYPES
@@ -284,7 +284,7 @@ update msg model =
                                     replacePlaceholder MT.map id item model.comments
                                         |> MT.filter isNotDeleted
                                         |> Maybe.withDefault emptyComments
-                                        |> treeReplace addChildren
+                                        |> MTE.replace addChildren
                                 , itemsCache = Dict.insert id item model.itemsCache
                             }
 
@@ -529,15 +529,3 @@ fetchChildren parentId model =
             fetchChild parent
     in
     ( { model | comments = comments }, cmdList )
-
-
-
--- TREE
-
-
-{-| Map every tree node to a new node.
--}
-treeReplace : (MT.Tree a -> Maybe (MT.Tree a)) -> MT.Tree a -> MT.Tree a
-treeReplace fn ((MT.Tree datum children) as tree) =
-    fn tree
-        |> Maybe.withDefault (MT.Tree datum (List.map (treeReplace fn) children))
