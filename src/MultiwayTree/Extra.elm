@@ -1,15 +1,41 @@
 module MultiwayTree.Extra exposing
-    ( goToPath
-    , replace
-    , updatePath
-    , removeChild
+    ( Path
+    , goToPath
+    , replace, updateAt, removeChild
+    , zipperChildren
     )
 
+{-| Adds extra function to MultiwayTree and MultiwayTreeZipper.
+
+
+# Types
+
+@docs Path
+
+
+# Navigation API
+
+@docs goToPath
+
+
+# Update API
+
+@docs replace, updateAt, removeChild
+
+
+# Access API
+
+@docs zipperChildren
+
+-}
+
 import List.Extra
-import MultiwayTree exposing (Tree(..))
-import MultiwayTreeZipper exposing (Breadcrumbs, Zipper, goToRoot, goToChild)
+import MultiwayTree exposing (Forest, Tree(..))
+import MultiwayTreeZipper exposing (Breadcrumbs, Zipper, goToChild, goToRoot)
 
 
+{-| Defines a path to a tree node relative to root.
+-}
 type alias Path =
     List Int
 
@@ -31,8 +57,8 @@ replace fn ((Tree datum children) as tree) =
 
 {-| Update tree at given path.
 -}
-updatePath : (Zipper a -> Maybe (Zipper a)) -> Path -> Zipper a -> Zipper a
-updatePath fn path tree =
+updateAt : (Zipper a -> Maybe (Zipper a)) -> Path -> Zipper a -> Zipper a
+updateAt fn path tree =
     tree
         |> goToPath path
         |> Maybe.andThen fn
@@ -43,5 +69,16 @@ updatePath fn path tree =
 {-| Remove child at index.
 -}
 removeChild : Int -> Zipper a -> Maybe (Zipper a)
-removeChild idx ( Tree d c, breadcrumbs ) =
-    Just ( Tree d (List.Extra.removeAt idx c), breadcrumbs )
+removeChild idx ( Tree datum children, breadcrumbs ) =
+    Just ( Tree datum (List.Extra.removeAt idx children), breadcrumbs )
+
+
+{-| Get children of zipper.
+-}
+zipperChildren : Zipper a -> Forest a
+zipperChildren zipper =
+    let
+        ( Tree _ children, _ ) =
+            zipper
+    in
+    children
