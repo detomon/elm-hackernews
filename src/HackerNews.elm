@@ -399,8 +399,8 @@ httpGet r =
 decodeItemWithType : String -> D.Decoder Item
 decodeItemWithType type_ =
     let
-        timeFromSeconds seconds =
-            Time.millisToPosix (seconds * 1000)
+        timeFromInt =
+            D.int |> D.map (\seconds -> Time.millisToPosix (seconds * 1000))
     in
     case type_ of
         "story" ->
@@ -410,7 +410,7 @@ decodeItemWithType type_ =
                 |> JP.required "id" D.int
                 |> JP.optional "kids" (D.list D.int) []
                 |> JP.required "score" D.int
-                |> JP.required "time" (D.int |> D.map timeFromSeconds)
+                |> JP.required "time" timeFromInt
                 |> JP.required "title" D.string
                 |> JP.optional "url" (D.string |> D.map Just) Nothing
                 |> D.map ItemStory
@@ -422,7 +422,7 @@ decodeItemWithType type_ =
                 |> JP.optional "kids" (D.list D.int) []
                 |> JP.required "parent" D.int
                 |> JP.optional "text" D.string ""
-                |> JP.custom (D.field "time" D.int |> D.map timeFromSeconds)
+                |> JP.required "time" timeFromInt
                 |> JP.optional "deleted" D.bool False
                 |> D.map ItemComment
 
@@ -431,7 +431,7 @@ decodeItemWithType type_ =
                 |> JP.required "by" D.string
                 |> JP.required "id" D.int
                 |> JP.required "score" D.int
-                |> JP.required "time" (D.int |> D.map timeFromSeconds)
+                |> JP.required "time" timeFromInt
                 |> JP.required "title" D.string
                 |> JP.optional "url" (D.string |> D.map Just) Nothing
                 |> D.map ItemJob

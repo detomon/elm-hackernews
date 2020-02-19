@@ -44,7 +44,7 @@ type alias Path =
 -}
 goToPath : Path -> Zipper a -> Maybe (Zipper a)
 goToPath path zipper =
-    List.foldl (\i -> Maybe.andThen (goToChild i)) (Just zipper) path
+    List.foldl (\idx -> Maybe.andThen (goToChild idx)) (Just zipper) path
 
 
 {-| Map tree node to a new node.

@@ -122,8 +122,8 @@ subscriptions _ =
 
 
 updateHackernews : Model -> ( HN.Model, Cmd HN.Msg ) -> ( Model, Cmd Msg )
-updateHackernews newModel ( hackernews, cmd ) =
-    ( { newModel | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
+updateHackernews model ( hackernews, cmd ) =
+    ( { model | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
 
 
 handleUrl : Url.Url -> Model -> ( Model, Cmd Msg )
@@ -148,8 +148,8 @@ handleUrl url model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        setShowComments m =
-            { m | showComments = True }
+        setShowComments show m =
+            { m | showComments = show }
     in
     case msg of
         -- fetch top stories after retrieving time zone
@@ -166,16 +166,16 @@ update msg model =
             model.hackernews
                 |> HN.fetchChildren itemId
                 |> updateHackernews model
-                |> Tuple.mapFirst setShowComments
+                |> Tuple.mapFirst (setShowComments True)
 
         HideComments ->
-            ( { model | showComments = False }, Cmd.none )
+            ( setShowComments False model, Cmd.none )
 
         KeyDown keyCode ->
             let
                 newModel =
                     if keyCode == 27 then
-                        { model | showComments = False }
+                        setShowComments False model
 
                     else
                         model
@@ -317,7 +317,7 @@ viewComments children =
                 ]
 
         keyedTree (MT.Tree child subchildren) =
-            ( String.fromInt <| HN.itemId child, post child subchildren )
+            ( String.fromInt <| HN.itemId child, Lazy.lazy2 post child subchildren )
 
         posts =
             List.map keyedTree children
