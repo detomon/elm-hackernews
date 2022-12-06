@@ -1,8 +1,10 @@
 # Elm Hacker News Client
 
-A Hacker News client using [Elm](https://elm-lang.org]).
+A [Hacker News](https://news.ycombinator.com) client using [Elm](https://elm-lang.org]).
 
-Needs `elm` and `uglifyjs` to build:
+## Build
+
+This is only needed if something is changed. Needs `elm` and `uglifyjs` to build the script.
 
 ```sh
 brew install elm
@@ -14,3 +16,7 @@ Build `elm.min.js` with `make`:
 ```sh
 make
 ```
+
+## Preview
+
+<https://hn.monoxid.ch>
