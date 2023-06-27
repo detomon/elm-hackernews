@@ -35,6 +35,7 @@ import MultiwayTree.Extra as MTE
 import Time
 
 
+
 -- TYPES
 
 
@@ -54,7 +55,7 @@ type alias ItemId =
 {-| Model.
 -}
 type alias Model =
-    { allIitemIds : List ItemId
+    { allItemIds : List ItemId
     , pagedItems : List Item
     , comments : MT.Tree Item
     , itemsCache : Dict.Dict ItemId Item
@@ -159,7 +160,7 @@ httpTimeout =
 -}
 empty : Int -> Model
 empty itemsPerPage =
-    { allIitemIds = []
+    { allItemIds = []
     , pagedItems = []
     , comments = emptyComments
     , itemsCache = Dict.empty
@@ -186,7 +187,7 @@ paging itemsPerPage page =
 -}
 pagesCount : Model -> Int
 pagesCount model =
-    (List.length model.allIitemIds + model.itemsPerPage - 1) // model.itemsPerPage
+    (List.length model.allItemIds + model.itemsPerPage - 1) // model.itemsPerPage
 
 
 {-| Get error string from Http error.
@@ -240,7 +241,7 @@ update msg model =
         GotTopStories result ->
             case result of
                 Ok ids ->
-                    setPage model.page { model | allIitemIds = ids }
+                    setPage model.page { model | allItemIds = ids }
 
                 Err err ->
                     setError err
@@ -257,21 +258,16 @@ update msg model =
                                 _ ->
                                     True
 
-                        newItemKids =
-                            case item of
-                                ItemComment { kids } ->
-                                    kids
-
-                                _ ->
-                                    []
-
                         addChildren (MT.Tree child _) =
                             let
-                                placeholder childId =
+                                makePlaceholder childId =
                                     MT.Tree (ItemPlaceholder childId) []
+
+                                kids =
+                                    itemKids item
                             in
                             if itemId child == id then
-                                MT.Tree child (List.map placeholder newItemKids)
+                                MT.Tree child (List.map makePlaceholder kids)
                                     |> Just
 
                             else
@@ -358,7 +354,7 @@ setPage page model =
             max 0 page
 
         pagedItemsIds =
-            model.allIitemIds
+            model.allItemIds
                 |> paging model.itemsPerPage newPage
 
         ( pagedItems, cmd ) =

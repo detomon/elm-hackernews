@@ -784,11 +784,11 @@ function _Debug_crash_UNUSED(identifier, fact1, fact2, fact3, fact4)
 
 function _Debug_regionToString(region)
 {
-	if (region.az.U === region.aK.U)
+	if (region.az.T === region.aK.T)
 	{
-		return 'on line ' + region.az.U;
+		return 'on line ' + region.az.T;
 	}
-	return 'on lines ' + region.az.U + ' through ' + region.aK.U;
+	return 'on lines ' + region.az.T + ' through ' + region.aK.T;
 }
 
 
@@ -4337,13 +4337,13 @@ var _Http_toTask = F3(function(router, toTask, request)
 	return _Scheduler_binding(function(callback)
 	{
 		function done(response) {
-			callback(toTask(request.ad.a(response)));
+			callback(toTask(request.ac.a(response)));
 		}
 
 		var xhr = new XMLHttpRequest();
 		xhr.addEventListener('error', function() { done($elm$http$Http$NetworkError_); });
 		xhr.addEventListener('timeout', function() { done($elm$http$Http$Timeout_); });
-		xhr.addEventListener('load', function() { done(_Http_toResponse(request.ad.b, xhr)); });
+		xhr.addEventListener('load', function() { done(_Http_toResponse(request.ac.b, xhr)); });
 		$elm$core$Maybe$isJust(request.bE) && _Http_track(router, xhr, request.bE.a);
 
 		try {
@@ -4371,7 +4371,7 @@ function _Http_configureRequest(xhr, request)
 		xhr.setRequestHeader(headers.a.a, headers.a.b);
 	}
 	xhr.timeout = request.bD.a || 0;
-	xhr.responseType = request.ad.d;
+	xhr.responseType = request.ac.d;
 	xhr.withCredentials = request.a8;
 }
 
@@ -6298,7 +6298,7 @@ var $elm$core$Basics$composeR = F3(
 	});
 var $author$project$HackerNews$Comment = F7(
 	function (by, id, kids, parent, text, time, deleted) {
-		return {am: by, aJ: deleted, E: id, T: kids, bt: parent, bC: text, aB: time};
+		return {am: by, aJ: deleted, E: id, af: kids, bt: parent, bC: text, aB: time};
 	});
 var $author$project$HackerNews$ItemComment = function (a) {
 	return {$: 2, a: a};
@@ -6315,7 +6315,7 @@ var $author$project$HackerNews$Job = F6(
 	});
 var $author$project$HackerNews$Story = F8(
 	function (by, descendants, id, kids, score, time, title, url) {
-		return {am: by, bd: descendants, E: id, T: kids, a0: score, aB: time, a5: title, M: url};
+		return {am: by, bd: descendants, E: id, af: kids, a0: score, aB: time, a5: title, M: url};
 	});
 var $elm$json$Json$Decode$bool = _Json_decodeBool;
 var $elm$json$Json$Decode$fail = _Json_fail;
@@ -6743,7 +6743,7 @@ var $elm$http$Http$cmdMap = F2(
 				{
 					a8: r.a8,
 					ba: r.ba,
-					ad: A2(_Http_mapExpect, func, r.ad),
+					ac: A2(_Http_mapExpect, func, r.ac),
 					bg: r.bg,
 					bm: r.bm,
 					bD: r.bD,
@@ -6771,13 +6771,13 @@ var $elm$http$Http$subscription = _Platform_leaf('Http');
 var $elm$http$Http$request = function (r) {
 	return $elm$http$Http$command(
 		$elm$http$Http$Request(
-			{a8: false, ba: r.ba, ad: r.ad, bg: r.bg, bm: r.bm, bD: r.bD, bE: r.bE, M: r.M}));
+			{a8: false, ba: r.ba, ac: r.ac, bg: r.bg, bm: r.bm, bD: r.bD, bE: r.bE, M: r.M}));
 };
 var $author$project$HackerNews$httpGet = function (r) {
 	return $elm$http$Http$request(
 		{
 			ba: $elm$http$Http$emptyBody,
-			ad: r.ad,
+			ac: r.ac,
 			bg: _List_Nil,
 			bm: 'GET',
 			bD: $elm$core$Maybe$Just($author$project$HackerNews$httpTimeout),
@@ -6831,7 +6831,7 @@ var $author$project$HackerNews$fetchItems = F2(
 			function (msg, id) {
 				return $author$project$HackerNews$httpGet(
 					{
-						ad: A2($elm$http$Http$expectJson, msg, decodeItem),
+						ac: A2($elm$http$Http$expectJson, msg, decodeItem),
 						M: $author$project$HackerNews$itemUrl(id)
 					});
 			});
@@ -7392,10 +7392,10 @@ var $author$project$Main$subscriptions = function (_v0) {
 var $author$project$HackerNews$itemKids = function (item) {
 	switch (item.$) {
 		case 1:
-			var kids = item.a.T;
+			var kids = item.a.af;
 			return kids;
 		case 2:
-			var kids = item.a.T;
+			var kids = item.a.af;
 			return kids;
 		default:
 			return _List_Nil;
@@ -7457,10 +7457,19 @@ var $author$project$HackerNews$fetchTopStories = function () {
 	var decodeItemIds = $elm$json$Json$Decode$list($elm$json$Json$Decode$int);
 	return $author$project$HackerNews$httpGet(
 		{
-			ad: A2($elm$http$Http$expectJson, $author$project$HackerNews$GotTopStories, decodeItemIds),
+			ac: A2($elm$http$Http$expectJson, $author$project$HackerNews$GotTopStories, decodeItemIds),
 			M: $author$project$HackerNews$topStoriesUrl
 		});
 }();
+var $author$project$Main$KeyEscape = 1;
+var $author$project$Main$KeyOther = 0;
+var $author$project$Main$getKeyAction = function (keyCode) {
+	if (keyCode === 27) {
+		return 1;
+	} else {
+		return 0;
+	}
+};
 var $elm$browser$Browser$Navigation$load = _Browser_load;
 var $elm$core$Tuple$mapFirst = F2(
 	function (func, _v0) {
@@ -7546,16 +7555,19 @@ var $author$project$MultiwayTree$Extra$replace = F2(
 	function (fn, tree) {
 		var datum = tree.a;
 		var children = tree.b;
-		return A2(
-			$elm$core$Maybe$withDefault,
-			A2(
+		var _v0 = fn(tree);
+		if (!_v0.$) {
+			var tree_ = _v0.a;
+			return tree_;
+		} else {
+			return A2(
 				$tomjkidd$elm_multiway_tree_zipper$MultiwayTree$Tree,
 				datum,
 				A2(
 					$elm$core$List$map,
 					$author$project$MultiwayTree$Extra$replace(fn),
-					children)),
-			fn(tree));
+					children));
+		}
 	});
 var $author$project$HackerNews$resultErrorString = function (error) {
 	switch (error.$) {
@@ -7622,14 +7634,6 @@ var $author$project$HackerNews$update = F2(
 			var result = msg.b;
 			if (!result.$) {
 				var item = result.a;
-				var newItemKids = function () {
-					if (item.$ === 2) {
-						var kids = item.a.T;
-						return kids;
-					} else {
-						return _List_Nil;
-					}
-				}();
 				var isNotDeleted = function (comment) {
 					if (comment.$ === 2) {
 						var deleted = comment.a.aJ;
@@ -7640,19 +7644,20 @@ var $author$project$HackerNews$update = F2(
 				};
 				var addChildren = function (_v5) {
 					var child = _v5.a;
-					var placeholder = function (childId) {
+					var makePlaceholder = function (childId) {
 						return A2(
 							$tomjkidd$elm_multiway_tree_zipper$MultiwayTree$Tree,
 							$author$project$HackerNews$ItemPlaceholder(childId),
 							_List_Nil);
 					};
+					var kids = $author$project$HackerNews$itemKids(item);
 					return _Utils_eq(
 						$author$project$HackerNews$itemId(child),
 						id) ? $elm$core$Maybe$Just(
 						A2(
 							$tomjkidd$elm_multiway_tree_zipper$MultiwayTree$Tree,
 							child,
-							A2($elm$core$List$map, placeholder, newItemKids))) : $elm$core$Maybe$Nothing;
+							A2($elm$core$List$map, makePlaceholder, kids))) : $elm$core$Maybe$Nothing;
 				};
 				var newModel = _Utils_update(
 					model,
@@ -7731,7 +7736,14 @@ var $author$project$Main$update = F2(
 					$elm$core$Platform$Cmd$none);
 			case 7:
 				var keyCode = msg.a;
-				var newModel = (keyCode === 27) ? A2(setShowComments, false, model) : model;
+				var newModel = function () {
+					var _v1 = $author$project$Main$getKeyAction(keyCode);
+					if (_v1 === 1) {
+						return A2(setShowComments, false, model);
+					} else {
+						return model;
+					}
+				}();
 				return _Utils_Tuple2(newModel, $elm$core$Platform$Cmd$none);
 			case 0:
 				var request = msg.a;
@@ -8822,7 +8834,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$extractOrderedListRM = function (
 					R: delimiter,
 					i: $elm$core$String$length(indentString) + 1,
 					s: false,
-					Z: A2(
+					Y: A2(
 						$elm$core$Maybe$withDefault,
 						$pablohirafuji$elm_markdown$Markdown$Block$Unordered,
 						A2(
@@ -8932,7 +8944,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$extractUnorderedListRM = function
 					R: delimiter,
 					i: $elm$core$String$length(indentString) + 1,
 					s: false,
-					Z: $pablohirafuji$elm_markdown$Markdown$Block$Unordered
+					Y: $pablohirafuji$elm_markdown$Markdown$Block$Unordered
 				},
 				A2($elm$core$Maybe$withDefault, '', maybeIndentSpace),
 				A2($elm$core$Maybe$withDefault, '', maybeRawLine)));
@@ -9346,7 +9358,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseListLine = F3(
 								A2($pablohirafuji$elm_markdown$Markdown$Block$addToParagraph, rawText, rawLine),
 								astTail);
 						} else {
-							var _v5 = listBlock.Z;
+							var _v5 = listBlock.Y;
 							if (_v5.$ === 1) {
 								if (_v5.a === 1) {
 									return newList;
@@ -9449,7 +9461,7 @@ var $pablohirafuji$elm_markdown$Markdown$Inline$Text = function (a) {
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$matchToInline = function (_v0) {
 	var match = _v0;
-	var _v1 = match.Z;
+	var _v1 = match.Y;
 	switch (_v1.$) {
 		case 0:
 			return $pablohirafuji$elm_markdown$Markdown$Inline$Text(match.bC);
@@ -9491,7 +9503,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$matchToInline = function (
 			var model = _v1.a;
 			return A3(
 				$pablohirafuji$elm_markdown$Markdown$Inline$HtmlInline,
-				model.W,
+				model.V,
 				model.aG,
 				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.a));
 		default:
@@ -9580,7 +9592,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$normalMatch = function (te
 		bC: $pablohirafuji$elm_markdown$Markdown$Helpers$formatStr(text),
 		L: 0,
 		o: 0,
-		Z: $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType
+		Y: $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType
 	};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatch = F3(
@@ -9602,7 +9614,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatch = F3(
 		} else {
 			var matchHead = parsedMatches.a;
 			var matchesTail = parsedMatches.b;
-			return _Utils_eq(matchHead.Z, $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType) ? A2($elm$core$List$cons, updtMatch, parsedMatches) : (_Utils_eq(matchModel.aK, matchHead.az) ? A2($elm$core$List$cons, updtMatch, parsedMatches) : ((_Utils_cmp(matchModel.aK, matchHead.az) < 0) ? A2(
+			return _Utils_eq(matchHead.Y, $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType) ? A2($elm$core$List$cons, updtMatch, parsedMatches) : (_Utils_eq(matchModel.aK, matchHead.az) ? A2($elm$core$List$cons, updtMatch, parsedMatches) : ((_Utils_cmp(matchModel.aK, matchHead.az) < 0) ? A2(
 				$elm$core$List$cons,
 				updtMatch,
 				A2(
@@ -10120,7 +10132,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$autolinkToMatch = function
 		_Utils_update(
 			match,
 			{
-				Z: $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType(
+				Y: $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType(
 					_Utils_Tuple2(
 						match.bC,
 						$pablohirafuji$elm_markdown$Markdown$InlineParser$encodeUrl(match.bC)))
@@ -10174,8 +10186,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$inlineLinkTypeOrImageTypeR
 					matchModel,
 					{
 						aK: matchModel.aK + $elm$core$String$length(regexMatch.bl),
-						Z: function () {
-							var _v5 = matchModel.Z;
+						Y: function () {
+							var _v5 = matchModel.Y;
 							if (_v5.$ === 5) {
 								return $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageType;
 							} else {
@@ -10250,8 +10262,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$refRegexToMatch = F3(
 				matchModel,
 				{
 					aK: matchModel.aK + regexMatchLength,
-					Z: function () {
-						var _v0 = matchModel.Z;
+					Y: function () {
+						var _v0 = matchModel.Y;
 						if (_v0.$ === 5) {
 							return $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageType;
 						} else {
@@ -10339,7 +10351,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emailAutolinkTypeToMatch =
 		_Utils_update(
 			match,
 			{
-				Z: $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType(
+				Y: $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType(
 					_Utils_Tuple2(
 						match.bC,
 						'mailto:' + $pablohirafuji$elm_markdown$Markdown$InlineParser$encodeUrl(match.bC)))
@@ -10398,7 +10410,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$findToken = F2(
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$HtmlModel = F2(
 	function (tag, attributes) {
-		return {aG: attributes, W: tag};
+		return {aG: attributes, V: tag};
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$HtmlToken = F2(
 	function (a, b) {
@@ -10531,7 +10543,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$isCloseToken = F2(
 		var _v0 = token.c;
 		if ((_v0.$ === 5) && (!_v0.a)) {
 			var htmlModel_ = _v0.b;
-			return _Utils_eq(htmlModel.W, htmlModel_.W);
+			return _Utils_eq(htmlModel.V, htmlModel_.V);
 		} else {
 			return false;
 		}
@@ -10582,7 +10594,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$isOpenEmphasisToken = F2(
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$voidHtmlTags = _List_fromArray(
 	['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$isVoidTag = function (htmlModel) {
-	return A2($elm$core$List$member, htmlModel.W, $pablohirafuji$elm_markdown$Markdown$InlineParser$voidHtmlTags);
+	return A2($elm$core$List$member, htmlModel.V, $pablohirafuji$elm_markdown$Markdown$InlineParser$voidHtmlTags);
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakType = {$: 1};
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$SoftLineBreakToken = {$: 7};
@@ -10595,7 +10607,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$reverseTokens = function (
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$tokenToMatch = F2(
 	function (token, type_) {
-		return {aK: token.bj + token.b, a: _List_Nil, az: token.bj, bC: '', L: 0, o: 0, Z: type_};
+		return {aK: token.bj + token.b, a: _List_Nil, az: token.bj, bC: '', L: 0, o: 0, Y: type_};
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$lineBreakTTM = function (_v0) {
 	lineBreakTTM:
@@ -10858,9 +10870,9 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisToMatch = F4(
 		var innerTokens = _v15.b;
 		var remainTokens = _v15.c;
 		var remainLength = openToken.b - closeToken.b;
-		var updt = (!remainLength) ? {ac: closeToken, V: openToken, ah: remainTokens, aj: tokensTail} : ((remainLength > 0) ? {
-			ac: closeToken,
-			V: _Utils_update(
+		var updt = (!remainLength) ? {ab: closeToken, U: openToken, ah: remainTokens, aj: tokensTail} : ((remainLength > 0) ? {
+			ab: closeToken,
+			U: _Utils_update(
 				openToken,
 				{bj: openToken.bj + remainLength, b: closeToken.b}),
 			ah: A2(
@@ -10871,10 +10883,10 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisToMatch = F4(
 				remainTokens),
 			aj: tokensTail
 		} : {
-			ac: _Utils_update(
+			ab: _Utils_update(
 				closeToken,
 				{b: openToken.b}),
-			V: openToken,
+			U: openToken,
 			ah: remainTokens,
 			aj: A2(
 				$elm$core$List$cons,
@@ -10889,9 +10901,9 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisToMatch = F4(
 			function (s) {
 				return s;
 			},
-			$pablohirafuji$elm_markdown$Markdown$InlineParser$EmphasisType(updt.V.b),
-			updt.V,
-			updt.ac,
+			$pablohirafuji$elm_markdown$Markdown$InlineParser$EmphasisType(updt.U.b),
+			updt.U,
+			updt.ab,
 			$elm$core$List$reverse(innerTokens));
 		return _Utils_Tuple2(
 			updt.aj,
@@ -11138,7 +11150,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$tokenPairToMatch = F6(
 				A3($elm$core$String$slice, textStart, textEnd, model.l)),
 			L: textEnd,
 			o: textStart,
-			Z: type_
+			Y: type_
 		};
 		var matches = A2(
 			$elm$core$List$map,
@@ -11785,7 +11797,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$defaultHtml = F3(
 					return A2($elm$core$List$cons, a, _List_Nil);
 				}(
 					function () {
-						var _v5 = model.Z;
+						var _v5 = model.Y;
 						if (_v5.$ === 1) {
 							var startInt = _v5.a;
 							return (startInt === 1) ? $elm$html$Html$ol(_List_Nil) : $elm$html$Html$ol(
@@ -11836,10 +11848,10 @@ var $pablohirafuji$elm_markdown$Markdown$toHtml = F2(
 				A2($pablohirafuji$elm_markdown$Markdown$Block$parse, maybeOptions, rawText)));
 	});
 var $author$project$Main$viewPostTitle = function (_v0) {
-	var _class = _v0.ab;
+	var _class = _v0.aa;
 	var title = _v0.a5;
-	var info = _v0.af;
-	var href = _v0.ae;
+	var info = _v0.ae;
+	var href = _v0.ad;
 	var textNode = $elm$html$Html$text(title);
 	var link = function (url) {
 		return A2(
@@ -11888,9 +11900,9 @@ var $author$project$Main$viewPost = function (post) {
 			var id = post.a;
 			return $author$project$Main$viewPostTitle(
 				{
-					ab: 'post--placeholder',
-					ae: $elm$core$Maybe$Nothing,
-					af: _List_fromArray(
+					aa: 'post--placeholder',
+					ad: $elm$core$Maybe$Nothing,
+					ae: _List_fromArray(
 						[
 							$elm$html$Html$text($author$project$Main$nobreakSpace)
 						]),
@@ -11917,7 +11929,7 @@ var $author$project$Main$viewPost = function (post) {
 						]))
 				]);
 			return $author$project$Main$viewPostTitle(
-				{ab: '', ae: story.M, af: info, a5: story.a5});
+				{aa: '', ad: story.M, ae: info, a5: story.a5});
 		case 2:
 			var comment = post.a;
 			var text = '<div>' + (comment.bC + '</div>');
@@ -11948,9 +11960,9 @@ var $author$project$Main$viewPost = function (post) {
 			var infoText = $elm$core$String$fromInt(job.a0) + (' points by ' + job.am);
 			return $author$project$Main$viewPostTitle(
 				{
-					ab: '',
-					ae: job.M,
-					af: _List_fromArray(
+					aa: '',
+					ad: job.M,
+					ae: _List_fromArray(
 						[
 							$elm$html$Html$text(infoText)
 						]),

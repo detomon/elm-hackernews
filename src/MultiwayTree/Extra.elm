@@ -51,8 +51,18 @@ goToPath path zipper =
 -}
 replace : (Tree a -> Maybe (Tree a)) -> Tree a -> Tree a
 replace fn ((Tree datum children) as tree) =
-    fn tree
-        |> Maybe.withDefault (Tree datum (List.map (replace fn) children))
+    case fn tree of
+        Just tree_ ->
+            tree_
+
+        Nothing ->
+            Tree datum <|
+                List.map (replace fn) children
+
+
+
+--fn tree
+--    |> Maybe.withDefault (Tree datum (List.map (replace fn) children))
 
 
 {-| Update tree at given path.

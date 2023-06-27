@@ -5,7 +5,7 @@ import Browser.Events as Events
 import Browser.Navigation as Nav
 import Dict
 import HackerNews as HN
-import Html as H
+import Html as H exposing (Html)
 import Html.Attributes as A
 import Html.Events as E
 import Html.Keyed as Keyed
@@ -18,16 +18,20 @@ import Markdown.Config as MC
 import MultiwayTree as MT
 import Task
 import Time
-import Url
+import Url exposing (Url)
 import Url.Parser as UP exposing ((</>), Parser)
+
+
+type alias Hackernews =
+    HN.Model
 
 
 type alias Model =
     { key : Nav.Key
-    , url : Url.Url
+    , url : Url
     , title : String
     , timeZone : Time.Zone
-    , hackernews : HN.Model
+    , hackernews : Hackernews
     , showComments : Bool
     }
 
@@ -40,7 +44,7 @@ type Item
 
 type Msg
     = UrlRequest Browser.UrlRequest
-    | UrlChange Url.Url
+    | UrlChange Url
     | GotTimeZone Time.Zone
     | HackerNewsMsg HN.Msg
     | UpdatePage Int
@@ -52,6 +56,11 @@ type Msg
 type Route
     = PageHome
     | PageRoute Int
+
+
+type KeyAction
+    = KeyOther
+    | KeyEscape
 
 
 
@@ -70,8 +79,8 @@ itemsPerPage =
 routes : Parser (Route -> a) a
 routes =
     UP.oneOf
-        [  UP.map PageHome (UP.top)
-        ,  UP.map PageRoute (UP.s "page" </> UP.int)
+        [ UP.map PageHome UP.top
+        , UP.map PageRoute (UP.s "page" </> UP.int)
         ]
 
 
@@ -96,7 +105,7 @@ main =
         }
 
 
-init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
     let
         model =
@@ -121,12 +130,12 @@ subscriptions _ =
         ]
 
 
-updateHackernews : Model -> ( HN.Model, Cmd HN.Msg ) -> ( Model, Cmd Msg )
+updateHackernews : Model -> ( Hackernews, Cmd HN.Msg ) -> ( Model, Cmd Msg )
 updateHackernews model ( hackernews, cmd ) =
     ( { model | hackernews = hackernews }, Cmd.map HackerNewsMsg cmd )
 
 
-handleUrl : Url.Url -> Model -> ( Model, Cmd Msg )
+handleUrl : Url -> Model -> ( Model, Cmd Msg )
 handleUrl url model =
     let
         handleRoute route =
@@ -174,11 +183,12 @@ update msg model =
         KeyDown keyCode ->
             let
                 newModel =
-                    if keyCode == 27 then
-                        setShowComments False model
+                    case getKeyAction keyCode of
+                        KeyEscape ->
+                            setShowComments False model
 
-                    else
-                        model
+                        _ ->
+                            model
             in
             ( newModel, Cmd.none )
 
@@ -200,7 +210,7 @@ update msg model =
 
 {-| Conditionally render node
 -}
-nodeIf : String -> List (H.Attribute msg) -> List (H.Html msg) -> Bool -> H.Html msg
+nodeIf : String -> List (H.Attribute msg) -> List (Html msg) -> Bool -> Html msg
 nodeIf name attrs children flag =
     if flag then
         H.node name attrs children
@@ -211,7 +221,7 @@ nodeIf name attrs children flag =
 
 {-| Make keyed item.
 -}
-keyedItem : HN.Item -> ( String, H.Html Msg )
+keyedItem : HN.Item -> ( String, Html Msg )
 keyedItem item =
     ( String.fromInt (HN.itemId item), Lazy.lazy viewPost item )
 
@@ -259,7 +269,7 @@ view model =
 
 {-| View error.
 -}
-viewError : Maybe String -> H.Html Msg
+viewError : Maybe String -> Html Msg
 viewError error =
     let
         text =
@@ -273,7 +283,7 @@ viewError error =
 
 {-| Post items.
 -}
-viewItems : List HN.Item -> Int -> H.Html Msg
+viewItems : List HN.Item -> Int -> Html Msg
 viewItems items start =
     Keyed.node "ol"
         [ A.class "post-list"
@@ -284,7 +294,7 @@ viewItems items start =
 
 {-| Paging.
 -}
-viewPaging : Int -> Int -> H.Html Msg
+viewPaging : Int -> Int -> Html Msg
 viewPaging count page =
     let
         listItem n =
@@ -303,7 +313,7 @@ viewPaging count page =
 
 {-| Comments.
 -}
-viewComments : List (MT.Tree HN.Item) -> H.Html Msg
+viewComments : List (MT.Tree HN.Item) -> Html Msg
 viewComments children =
     let
         post i n =
@@ -334,6 +344,18 @@ markdownOptions =
     Just { options | rawHtml = MC.ParseUnsafe }
 
 
+{-| Get key action from key code.
+-}
+getKeyAction : Int -> KeyAction
+getKeyAction keyCode =
+    case keyCode of
+        27 ->
+            KeyEscape
+
+        _ ->
+            KeyOther
+
+
 {-| The non-breaking space.
 -}
 nobreakSpace : String
@@ -343,7 +365,7 @@ nobreakSpace =
 
 {-| Post.
 -}
-viewPost : HN.Item -> H.Html Msg
+viewPost : HN.Item -> Html Msg
 viewPost post =
     case post of
         HN.ItemPlaceholder id ->
@@ -410,10 +432,10 @@ viewPost post =
 viewPostTitle :
     { class : String
     , title : String
-    , info : List (H.Html Msg)
+    , info : List (Html Msg)
     , href : Maybe String
     }
-    -> H.Html Msg
+    -> Html Msg
 viewPostTitle { class, title, info, href } =
     let
         textNode =
